@@ -15954,3 +15954,356 @@ input[type="checkbox"] {
     flex-basis: 40px;
   }
 }
+/* =========================================================
+   MOBILE HEADER - FINAL OVERFLOW / MENU FIX
+========================================================= */
+
+@media (max-width: 768px) {
+
+  /* HEADER */
+  .header {
+    position: relative !important;
+    z-index: 9999 !important;
+
+    width: 100% !important;
+    max-width: 100% !important;
+
+    overflow: visible !important;
+  }
+
+  /* NAV BAR */
+  .header .nav {
+    position: relative !important;
+
+    width: 100% !important;
+    max-width: 100% !important;
+
+    min-height: 66px !important;
+
+    display: flex !important;
+    align-items: center !important;
+
+    padding: 7px 12px !important;
+
+    box-sizing: border-box !important;
+
+    overflow: visible !important;
+  }
+
+  /* =====================================================
+     HIDE DESKTOP NAV COMPLETELY
+  ===================================================== */
+
+  .header .links {
+    display: none !important;
+
+    width: 0 !important;
+    max-width: 0 !important;
+
+    overflow: hidden !important;
+  }
+
+  .header .search-nav-btn,
+  .header .track-nav-btn {
+    display: none !important;
+  }
+
+  /* =====================================================
+     BRAND
+  ===================================================== */
+
+  .header .brand {
+    display: flex !important;
+    align-items: center !important;
+
+    flex: 1 1 auto !important;
+
+    width: auto !important;
+    min-width: 0 !important;
+
+    max-width: calc(100% - 100px) !important;
+
+    overflow: hidden !important;
+  }
+
+  .header .brand img {
+    width: 43px !important;
+    height: 43px !important;
+
+    min-width: 43px !important;
+    max-width: 43px !important;
+
+    object-fit: contain !important;
+
+    flex-shrink: 0 !important;
+  }
+
+  .header .brand-text {
+    display: flex !important;
+    flex-direction: column !important;
+
+    min-width: 0 !important;
+
+    margin-left: 8px !important;
+
+    overflow: hidden !important;
+  }
+
+  .header .brand-text span {
+    display: block !important;
+
+    max-width: 170px !important;
+
+    overflow: hidden !important;
+
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+
+    font-size: 14px !important;
+    line-height: 1.2 !important;
+  }
+
+  .header .brand-text small {
+    display: block !important;
+
+    white-space: nowrap !important;
+
+    font-size: 8px !important;
+  }
+
+  /* =====================================================
+     ACTIONS
+  ===================================================== */
+
+  .header .nav-actions {
+    display: flex !important;
+    align-items: center !important;
+
+    flex: 0 0 auto !important;
+
+    width: auto !important;
+
+    gap: 6px !important;
+  }
+
+  /* CART */
+
+  .header .cart-nav-btn {
+    display: inline-flex !important;
+
+    width: 42px !important;
+    height: 42px !important;
+
+    min-width: 42px !important;
+
+    flex: 0 0 42px !important;
+  }
+
+  /* MENU BUTTON */
+
+  .header .mobile-menu-btn {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+
+    width: 42px !important;
+    height: 42px !important;
+
+    min-width: 42px !important;
+
+    flex: 0 0 42px !important;
+
+    padding: 0 !important;
+    margin: 0 !important;
+
+    border: 1px solid #e0e4ee !important;
+    border-radius: 11px !important;
+
+    background: #f7f8fc !important;
+
+    color: #20263a !important;
+  }
+
+  /* =====================================================
+     MOBILE MENU
+  ===================================================== */
+
+  .header .mobile-menu {
+    position: static !important;
+
+    top: auto !important;
+    right: auto !important;
+    left: auto !important;
+
+    width: 100% !important;
+    max-width: 100% !important;
+
+    height: auto !important;
+    max-height: none !important;
+
+    margin: 0 !important;
+
+    padding: 8px 12px 14px !important;
+
+    box-sizing: border-box !important;
+
+    display: none !important;
+
+    flex-direction: column !important;
+
+    gap: 3px !important;
+
+    overflow: visible !important;
+
+    background: #ffffff !important;
+
+    border-top: 1px solid #eef0f5 !important;
+    border-bottom: 1px solid #e8eaf2 !important;
+
+    box-shadow:
+      0 10px 25px rgba(25, 30, 55, 0.08) !important;
+
+    z-index: 9998 !important;
+  }
+
+  /* ONLY OPEN MENU IS VISIBLE */
+
+  .header .mobile-menu.mobile-menu-open {
+    display: flex !important;
+  }
+
+  /* MENU LINKS */
+
+  .header .mobile-menu a {
+    position: static !important;
+
+    display: flex !important;
+    align-items: center !important;
+
+    width: 100% !important;
+    min-height: 44px !important;
+
+    height: auto !important;
+
+    box-sizing: border-box !important;
+
+    margin: 0 !important;
+    padding: 0 13px !important;
+
+    border: 0 !important;
+    border-radius: 9px !important;
+
+    background: transparent !important;
+
+    color: #343b50 !important;
+
+    font-size: 13px !important;
+    font-weight: 700 !important;
+
+    line-height: 1.2 !important;
+
+    text-decoration: none !important;
+  }
+
+  .header .mobile-menu a:hover {
+    background: #f5f6ff !important;
+
+    color: #3742fa !important;
+  }
+
+  /* CART LINK */
+
+  .header .mobile-menu .mobile-cart-link {
+    display: flex !important;
+    align-items: center !important;
+
+    gap: 9px !important;
+
+    margin-top: 4px !important;
+
+    background: #f5f6ff !important;
+
+    color: #3742fa !important;
+  }
+
+  .header .mobile-cart-count {
+    display: inline-flex !important;
+
+    align-items: center !important;
+    justify-content: center !important;
+
+    min-width: 20px !important;
+    height: 20px !important;
+
+    margin-left: auto !important;
+    padding: 0 5px !important;
+
+    border-radius: 999px !important;
+
+    background: #3742fa !important;
+
+    color: #ffffff !important;
+
+    font-size: 10px !important;
+    font-weight: 800 !important;
+  }
+
+  /* =====================================================
+     IMPORTANT:
+     STOP HERO / PAGE FROM MOVING HORIZONTALLY
+  ===================================================== */
+
+  body {
+    width: 100% !important;
+    max-width: 100% !important;
+
+    overflow-x: hidden !important;
+  }
+
+  main {
+    max-width: 100% !important;
+
+    overflow-x: hidden !important;
+  }
+}
+
+/* =========================================================
+   VERY SMALL PHONES
+========================================================= */
+
+@media (max-width: 420px) {
+
+  .header .nav {
+    padding-left: 9px !important;
+    padding-right: 9px !important;
+  }
+
+  .header .brand {
+    max-width: calc(100% - 94px) !important;
+  }
+
+  .header .brand img {
+    width: 40px !important;
+    height: 40px !important;
+
+    min-width: 40px !important;
+    max-width: 40px !important;
+  }
+
+  .header .brand-text {
+    margin-left: 7px !important;
+  }
+
+  .header .brand-text span {
+    font-size: 13px !important;
+  }
+
+  .header .cart-nav-btn,
+  .header .mobile-menu-btn {
+    width: 40px !important;
+    height: 40px !important;
+
+    min-width: 40px !important;
+    flex-basis: 40px !important;
+  }
+}
