@@ -13,7 +13,7 @@ cloudinary.config({
   api_secret: apiSecret,
 });
 
-export async function POST(request: Request) {
+export async function POST(request) {
   try {
     // Check Cloudinary environment variables
     if (!cloudName || !apiKey || !apiSecret) {
@@ -40,33 +40,27 @@ export async function POST(request: Request) {
     }
 
     // Image or video
-    const resourceType =
-      body?.resourceType === "video"
-        ? "video"
-        : "image";
+    const resourceType = body?.resourceType === "video" ? "video" : "image";
 
     // Current timestamp
-    const timestamp = Math.floor(
-      Date.now() / 1000,
-    );
+    const timestamp = Math.floor(Date.now() / 1000);
 
     // Cloudinary folder
     const folder = "little-one-outlet";
 
-    // Parameters that will be signed
+    // Parameters to sign
     const paramsToSign = {
       timestamp,
       folder,
     };
 
-    // Generate signature
-    const signature =
-      cloudinary.utils.api_sign_request(
-        paramsToSign,
-        apiSecret,
-      );
+    // Generate Cloudinary signature
+    const signature = cloudinary.utils.api_sign_request(
+      paramsToSign,
+      apiSecret,
+    );
 
-    // Send data to browser
+    // Send response
     return NextResponse.json(
       {
         success: true,
@@ -82,15 +76,11 @@ export async function POST(request: Request) {
       },
     );
   } catch (error) {
-    console.error(
-      "Cloudinary signature error:",
-      error,
-    );
+    console.error("Cloudinary signature error:", error);
 
     return NextResponse.json(
       {
-        error:
-          "Failed to create Cloudinary upload signature.",
+        error: "Failed to create Cloudinary upload signature.",
       },
       {
         status: 500,
