@@ -23,6 +23,7 @@ export default function ProductVariants({
   onChange,
 }: ProductVariantsProps) {
   const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+
   const [uploadingVideo, setUploadingVideo] = useState<string | null>(null);
 
   const imageInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
@@ -53,16 +54,77 @@ export default function ProductVariants({
   };
 
   /* =========================================================
-     UPLOAD TO CLOUDINARY
+     DIRECT CLOUDINARY UPLOAD
   ========================================================= */
 
-  const uploadFile = async (file: File): Promise<string | null> => {
+  const uploadFile = async (
+    file: File,
+    resourceType: "image" | "video",
+  ): Promise<string | null> => {
     try {
+      /* =====================================================
+         STEP 1
+         GET SIGNATURE FROM OUR SERVER
+      ===================================================== */
+
+      const signatureResponse = await fetch("/api/cloudinary/sign", {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          resourceType,
+        }),
+      });
+
+      const signatureData = await signatureResponse.json();
+
+      if (!signatureResponse.ok) {
+        console.error("Signature error:", signatureData);
+
+        alert(signatureData?.error || "Could not prepare upload.");
+
+        return null;
+      }
+
+      /* =====================================================
+         STEP 2
+         CLOUDINARY UPLOAD URL
+      ===================================================== */
+
+      const uploadUrl =
+        `https://api.cloudinary.com/v1_1/` +
+        `${signatureData.cloudName}/` +
+        `${resourceType}/upload`;
+
+      /* =====================================================
+         STEP 3
+         CREATE CLOUDINARY FORM DATA
+      ===================================================== */
+
       const formData = new FormData();
 
       formData.append("file", file);
 
-      const response = await fetch("/api/upload", {
+      formData.append("api_key", signatureData.apiKey);
+
+      formData.append("timestamp", String(signatureData.timestamp));
+
+      formData.append("signature", signatureData.signature);
+
+      formData.append("folder", signatureData.folder);
+
+      /* =====================================================
+         STEP 4
+         DIRECT CLOUDINARY UPLOAD
+
+         Browser → Cloudinary
+         NOT Browser → Vercel → Cloudinary
+      ===================================================== */
+
+      const response = await fetch(uploadUrl, {
         method: "POST",
         body: formData,
       });
@@ -70,20 +132,29 @@ export default function ProductVariants({
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data?.error || "Upload failed. Please try again.");
+        console.error("Cloudinary upload error:", data);
+
+        alert(data?.error?.message || "Upload failed. Please try again.");
 
         return null;
       }
 
-      if (!data?.url) {
+      /* =====================================================
+         STEP 5
+         GET SECURE URL
+      ===================================================== */
+
+      if (!data?.secure_url) {
+        console.error("No secure_url:", data);
+
         alert("Upload completed but no URL was returned.");
 
         return null;
       }
 
-      return String(data.url);
+      return String(data.secure_url);
     } catch (error) {
-      console.error("Cloudinary upload error:", error);
+      console.error("Cloudinary direct upload error:", error);
 
       alert("Upload failed. Please try again.");
 
@@ -99,23 +170,35 @@ export default function ProductVariants({
     variantIndex: number,
     files: FileList | null,
   ) => {
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0) {
+      return;
+    }
 
     const variantId = variants[variantIndex]?.id;
 
-    if (!variantId) return;
+    if (!variantId) {
+      return;
+    }
 
     setUploadingImage(variantId);
 
     try {
       const uploadedUrls: string[] = [];
 
+      /* ===================================================
+         UPLOAD ALL SELECTED IMAGES
+      =================================================== */
+
       for (const file of Array.from(files)) {
+        /* IMAGE TYPE */
+
         if (!file.type.startsWith("image/")) {
           alert(`${file.name} is not an image file.`);
 
           continue;
         }
+
+        /* IMAGE SIZE */
 
         const maxSize = 10 * 1024 * 1024;
 
@@ -125,12 +208,18 @@ export default function ProductVariants({
           continue;
         }
 
-        const url = await uploadFile(file);
+        /* DIRECT CLOUDINARY */
+
+        const url = await uploadFile(file, "image");
 
         if (url) {
           uploadedUrls.push(url);
         }
       }
+
+      /* ===================================================
+         SAVE IMAGE URLS TO VARIANT
+      =================================================== */
 
       if (uploadedUrls.length > 0) {
         const current = variants[variantIndex];
@@ -167,17 +256,28 @@ export default function ProductVariants({
   ========================================================= */
 
   const handleVideoUpload = async (variantIndex: number, file: File | null) => {
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     const variantId = variants[variantIndex]?.id;
 
-    if (!variantId) return;
+    if (!variantId) {
+      return;
+    }
+
+    /* VIDEO TYPE */
 
     if (!file.type.startsWith("video/")) {
       alert("Please select a video file.");
 
       return;
     }
+
+    /* ===================================================
+         VIDEO SIZE
+         100MB
+      =================================================== */
 
     const maxSize = 100 * 1024 * 1024;
 
@@ -190,7 +290,11 @@ export default function ProductVariants({
     setUploadingVideo(variantId);
 
     try {
-      const url = await uploadFile(file);
+      /* =================================================
+           DIRECT CLOUDINARY VIDEO UPLOAD
+        ================================================= */
+
+      const url = await uploadFile(file, "video");
 
       if (url) {
         updateVariant(variantIndex, {
@@ -283,9 +387,9 @@ export default function ProductVariants({
 
           return (
             <div key={variant.id} className="admin-variant-card">
-              {/* =========================
+              {/* =================================================
                     HEADER
-                ========================= */}
+                ================================================= */}
 
               <div className="admin-variant-header">
                 <strong>Color #{variantIndex + 1}</strong>
@@ -299,9 +403,9 @@ export default function ProductVariants({
                 </button>
               </div>
 
-              {/* =========================
+              {/* =================================================
                     COLOR + STOCK
-                ========================= */}
+                ================================================= */}
 
               <div className="admin-variant-basic-grid">
                 <label>
@@ -385,7 +489,9 @@ export default function ProductVariants({
                       >
                         <img
                           src={image}
-                          alt={`${variant.color || "Product"} ${imageIndex + 1}`}
+                          alt={`${variant.color || "Product"} ${
+                            imageIndex + 1
+                          }`}
                         />
 
                         <button
@@ -444,6 +550,8 @@ export default function ProductVariants({
                     }
                   />
                 </div>
+
+                {/* VIDEO PREVIEW */}
 
                 {variant.video ? (
                   <div className="admin-variant-video-preview">

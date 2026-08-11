@@ -53,68 +53,41 @@ export default function ProductTable({
 
   if (!loading && !products.length) {
     return (
-      <div
-        style={{
-          padding: 45,
-          textAlign: "center",
-          border: "1px dashed var(--line)",
-          borderRadius: 16,
-          background: "#fafafa",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 42,
-            marginBottom: 10,
-          }}
-        >
-          🧸
-        </div>
+      <div className="admin-product-empty">
+        <div className="admin-product-empty-icon">🧸</div>
 
         <h3>No Products Yet</h3>
 
-        <p
-          className="muted"
-          style={{
-            margin: 0,
-          }}
-        >
-          Add your first product using the product form.
-        </p>
+        <p className="muted">Add your first product using the product form.</p>
       </div>
     );
   }
 
+  /* =====================================================
+     TABLE
+  ===================================================== */
+
   return (
-    <div
-      className="admin-product-table-wrapper"
-      style={{
-        width: "100%",
-        overflowX: "auto",
-      }}
-    >
-      <table
-        className="admin-product-table"
-        style={{
-          width: "100%",
-          borderCollapse: "collapse",
-          minWidth: 850,
-        }}
-      >
+    <div className="admin-product-table-wrapper">
+      <table className="admin-product-table">
+        <colgroup>
+          <col className="product-col" />
+          <col className="category-col" />
+          <col className="price-col" />
+          <col className="stock-col" />
+          <col className="colors-col" />
+          <col className="featured-col" />
+          <col className="actions-col" />
+        </colgroup>
+
         <thead>
           <tr>
             <th>Product</th>
-
             <th>Category</th>
-
             <th>Price</th>
-
             <th>Stock</th>
-
             <th>Colors</th>
-
             <th>Featured</th>
-
             <th>Actions</th>
           </tr>
         </thead>
@@ -137,183 +110,106 @@ export default function ProductTable({
 
             return (
               <tr key={String(product._id)}>
-                {/* =====================================
-                      PRODUCT
-                  ===================================== */}
+                {/* =================================================
+                    PRODUCT
+                ================================================= */}
 
-                <td>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                    }}
-                  >
+                <td className="product-cell">
+                  <div className="product-info">
                     {image ? (
                       <img
                         src={image}
                         alt={product.name}
-                        width={58}
-                        height={58}
-                        style={{
-                          width: 58,
-                          height: 58,
-                          objectFit: "cover",
-                          borderRadius: 10,
-                          border: "1px solid var(--line)",
-                          flexShrink: 0,
-                        }}
+                        className="product-thumb"
                       />
                     ) : (
-                      <div
-                        style={{
-                          width: 58,
-                          height: 58,
-                          borderRadius: 10,
-                          background: "#f3f4f6",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 25,
-                          flexShrink: 0,
-                        }}
-                      >
-                        🧸
-                      </div>
+                      <div className="product-thumb-placeholder">🧸</div>
                     )}
 
-                    <div
-                      style={{
-                        minWidth: 180,
-                      }}
-                    >
-                      <strong>{product.name}</strong>
+                    <div className="product-name-wrap">
+                      <strong className="product-name">{product.name}</strong>
 
-                      <small
-                        className="muted"
-                        style={{
-                          display: "block",
-                          marginTop: 3,
-                        }}
-                      >
+                      <small className="muted product-slug">
                         /{product.slug}
                       </small>
                     </div>
                   </div>
                 </td>
 
-                {/* =====================================
-                      CATEGORY
-                  ===================================== */}
+                {/* =================================================
+                    CATEGORY
+                ================================================= */}
 
                 <td>
-                  <span
-                    style={{
-                      display: "inline-block",
-                      padding: "5px 9px",
-                      borderRadius: 999,
-                      background: "#f3f4f6",
-                      fontSize: 12,
-                    }}
-                  >
-                    {product.category}
-                  </span>
+                  <span className="product-category">{product.category}</span>
                 </td>
 
-                {/* =====================================
-                      PRICE
-                  ===================================== */}
+                {/* =================================================
+                    PRICE
+                ================================================= */}
 
                 <td>
-                  <strong>৳{price}</strong>
+                  <div className="product-price">
+                    <strong>৳{price}</strong>
 
-                  {hasOffer && (
-                    <small
-                      className="muted"
-                      style={{
-                        display: "block",
-                        textDecoration: "line-through",
-                        marginTop: 2,
-                      }}
-                    >
-                      ৳{product.regularPrice}
-                    </small>
-                  )}
+                    {hasOffer && (
+                      <small className="product-old-price">
+                        ৳{product.regularPrice}
+                      </small>
+                    )}
+                  </div>
                 </td>
 
-                {/* =====================================
-                      STOCK
-                  ===================================== */}
+                {/* =================================================
+                    STOCK
+                ================================================= */}
 
                 <td>
-                  <span
-                    style={{
-                      fontWeight: 700,
-                      color:
+                  <div className="product-stock">
+                    <strong
+                      className={
                         stock <= 0
-                          ? "#c62828"
+                          ? "stock-out"
                           : stock <= 5
-                            ? "#b26a00"
-                            : "#16753b",
-                    }}
-                  >
-                    {stock}
-                  </span>
+                            ? "stock-low"
+                            : "stock-good"
+                      }
+                    >
+                      {stock}
+                    </strong>
 
-                  <small
-                    className="muted"
-                    style={{
-                      display: "block",
-                      marginTop: 2,
-                    }}
-                  >
-                    {stock <= 0
-                      ? "Out of stock"
-                      : stock <= 5
-                        ? "Low stock"
-                        : "In stock"}
-                  </small>
+                    <small className="muted">
+                      {stock <= 0
+                        ? "Out of stock"
+                        : stock <= 5
+                          ? "Low stock"
+                          : "In stock"}
+                    </small>
+                  </div>
                 </td>
 
-                {/* =====================================
-                      COLORS
-                  ===================================== */}
+                {/* =================================================
+                    COLORS
+                ================================================= */}
 
                 <td>
                   {variants.length > 0 ? (
-                    <div>
-                      <strong>{variants.length}</strong>
+                    <div className="product-colors">
+                      <strong className="color-count">{variants.length}</strong>
 
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 4,
-                          flexWrap: "wrap",
-                          marginTop: 5,
-                        }}
-                      >
+                      <div className="color-list">
                         {variants.slice(0, 4).map((variant) => (
                           <span
                             key={variant.id}
                             title={variant.color}
-                            style={{
-                              padding: "3px 7px",
-                              borderRadius: 999,
-                              background: "#f5f5f5",
-                              fontSize: 10,
-                            }}
+                            className="color-pill"
                           >
                             {variant.color}
                           </span>
                         ))}
 
                         {variants.length > 4 && (
-                          <span
-                            className="muted"
-                            style={{
-                              fontSize: 10,
-                            }}
-                          >
+                          <span className="color-more muted">
                             +{variants.length - 4}
                           </span>
                         )}
@@ -324,69 +220,36 @@ export default function ProductTable({
                   )}
                 </td>
 
-                {/* =====================================
-                      FEATURED
-                  ===================================== */}
+                {/* =================================================
+                    FEATURED
+                ================================================= */}
 
                 <td>
                   {product.featured ? (
-                    <span
-                      style={{
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        padding: "5px 9px",
-                        borderRadius: 999,
-                        background: "#fff7df",
-                        color: "#9a6800",
-                        fontSize: 11,
-                        fontWeight: 700,
-                      }}
-                    >
-                      ⭐ Featured
-                    </span>
+                    <span className="featured-badge">⭐ Featured</span>
                   ) : (
                     <span className="muted">—</span>
                   )}
                 </td>
 
-                {/* =====================================
-                      ACTIONS
-                  ===================================== */}
+                {/* =================================================
+                    ACTIONS
+                ================================================= */}
 
                 <td>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 7,
-                      alignItems: "center",
-                    }}
-                  >
+                  <div className="product-actions">
                     <button
                       type="button"
-                      className="btn secondary"
+                      className="btn secondary product-edit-btn"
                       onClick={() => onEdit(product)}
-                      style={{
-                        padding: "7px 11px",
-                        fontSize: 12,
-                      }}
                     >
                       Edit
                     </button>
 
                     <button
                       type="button"
+                      className="product-delete-btn"
                       onClick={() => onDelete(product)}
-                      style={{
-                        border: 0,
-                        background: "#fff1f1",
-                        color: "#c62828",
-                        borderRadius: 8,
-                        padding: "8px 11px",
-                        cursor: "pointer",
-                        fontWeight: 700,
-                        fontSize: 12,
-                      }}
                     >
                       Delete
                     </button>
