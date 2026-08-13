@@ -1,349 +1,433 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Product, ProductVariant } from "@/models/types";
+
+import ProductGallery from "@/components/ProductGallery";
+import ProductColorSelector from "@/components/ProductColorSelector";
 import AddToCart from "@/components/AddToCart";
 
 type ProductDetailsProps = {
   product: Product;
+  variants?: ProductVariant[];
 };
 
-export default function ProductDetails({ product }: ProductDetailsProps) {
-  const variants = product.variants || [];
+export default function ProductDetails({
+  product,
+  variants = [],
+}: ProductDetailsProps) {
+  /* =========================================================
+     SELECTED VARIANT
+  ========================================================= */
 
-  const [selectedVariantId, setSelectedVariantId] = useState<string | null>(
-    variants.length > 0 ? variants[0].id : null,
+  const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
+    variants.length > 0 ? variants[0] : null,
   );
 
-  const selectedVariant: ProductVariant | null = useMemo(() => {
-    if (!selectedVariantId) {
-      return null;
-    }
-
-    return variants.find((variant) => variant.id === selectedVariantId) || null;
-  }, [variants, selectedVariantId]);
-
-  const images = selectedVariant?.images?.length
-    ? selectedVariant.images
-    : product.images || [];
-
-  const [selectedImage, setSelectedImage] = useState(0);
+  /* =========================================================
+     PRICE
+  ========================================================= */
 
   const regularPrice = Number(product.regularPrice || 0);
 
   const offerPrice =
-    product.offerPrice != null ? Number(product.offerPrice) : null;
+    product.offerPrice !== undefined && product.offerPrice !== null
+      ? Number(product.offerPrice)
+      : null;
 
-  const hasOffer = offerPrice !== null && offerPrice < regularPrice;
+  const hasOffer =
+    offerPrice !== null && offerPrice > 0 && offerPrice < regularPrice;
 
-  const price = hasOffer ? offerPrice : regularPrice;
+  const finalPrice = hasOffer ? offerPrice : regularPrice;
 
-  const saving = hasOffer ? regularPrice - offerPrice : 0;
+  const discount = hasOffer
+    ? Math.round(((regularPrice - Number(offerPrice)) / regularPrice) * 100)
+    : 0;
 
-  const stock = selectedVariant
-    ? Number(selectedVariant.stock || 0)
+  /* =========================================================
+     STOCK
+  ========================================================= */
+
+  const hasVariants = variants.length > 0;
+
+  const stock = hasVariants
+    ? Number(selectedVariant?.stock || 0)
     : Number(product.stock || 0);
 
-  const inStock = stock > 0;
+  const outOfStock = stock <= 0;
 
-  const handleVariantChange = (variantId: string) => {
-    setSelectedVariantId(variantId);
+  /* =========================================================
+     CATEGORIES
+  ========================================================= */
 
-    setSelectedImage(0);
+  const categories = Array.isArray(product.categories)
+    ? product.categories.filter(Boolean)
+    : [];
+
+  /* =========================================================
+     VARIANT SELECT
+  ========================================================= */
+
+  const handleVariantSelect = (variant: ProductVariant) => {
+    setSelectedVariant(variant);
   };
 
+  /* =========================================================
+     RENDER
+  ========================================================= */
+
   return (
-    <div className="product-details-content">
-      {/* =================================================
-          PRODUCT GALLERY
-      ================================================= */}
+    <div
+      className="product-details-layout"
+      style={{
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1.05fr) minmax(0, 0.95fr)",
+        gap: 45,
+        alignItems: "start",
+      }}
+    >
+      {/* =====================================================
+          LEFT - PRODUCT GALLERY
+      ===================================================== */}
 
-      <div className="product-gallery">
-        {/* MAIN IMAGE */}
+      <div className="product-details-gallery">
+        <ProductGallery
+          images={product.images}
+          variants={variants}
+          selectedVariant={selectedVariant}
+          productName={product.name}
+        />
+      </div>
 
-        <div className="product-main-image">
-          {images.length > 0 ? (
-            <img
-              src={images[selectedImage] || images[0]}
-              alt={
-                selectedVariant
-                  ? `${product.name} ${selectedVariant.color}`
-                  : product.name
-              }
-            />
-          ) : (
-            <div className="product-image-empty">
-              <span>🧸</span>
+      {/* =====================================================
+          RIGHT - PRODUCT INFORMATION
+      ===================================================== */}
 
-              <p>No image available</p>
-            </div>
-          )}
+      <div className="product-details-info">
+        {/* ===================================================
+            CATEGORIES
+        =================================================== */}
 
-          {hasOffer && (
-            <span className="product-page-discount">
-              -{Math.round(((regularPrice - price) / regularPrice) * 100)}%
-            </span>
-          )}
-        </div>
-
-        {/* THUMBNAILS */}
-
-        {images.length > 1 && (
-          <div className="product-thumbnails">
-            {images.map((image, index) => (
-              <button
-                type="button"
-                key={`${image}-${index}`}
-                className={`product-thumbnail ${
-                  selectedImage === index ? "active" : ""
-                }`}
-                onClick={() => setSelectedImage(index)}
+        {categories.length > 0 && (
+          <div
+            className="product-detail-categories"
+            style={{
+              display: "flex",
+              gap: 7,
+              flexWrap: "wrap",
+              marginBottom: 8,
+            }}
+          >
+            {categories.map((category) => (
+              <span
+                key={category}
+                className="eyebrow"
+                style={{
+                  display: "inline-block",
+                }}
               >
-                <img src={image} alt={`${product.name} ${index + 1}`} />
-              </button>
+                {category}
+              </span>
             ))}
           </div>
         )}
 
-        {/* =================================================
-            VIDEO
-        ================================================= */}
+        {/* ===================================================
+            PRODUCT NAME
+        =================================================== */}
 
-        {selectedVariant?.video && (
-          <div className="product-video-section">
-            <h3>▶ See How It Works</h3>
+        <h1
+          style={{
+            margin: "8px 0 12px",
+            fontSize: "clamp(28px, 4vw, 44px)",
+            lineHeight: 1.1,
+          }}
+        >
+          {product.name}
+        </h1>
 
-            <div className="product-video-wrapper">
-              <video
-                controls
-                preload="metadata"
-                playsInline
-                src={selectedVariant.video}
-              >
-                Your browser does not support video playback.
-              </video>
-            </div>
+        {/* ===================================================
+            AGE RANGE
+        =================================================== */}
+
+        {product.ageRange && (
+          <div
+            className="muted"
+            style={{
+              marginBottom: 15,
+              fontSize: 13,
+            }}
+          >
+            👶 Recommended age: <strong>{product.ageRange}</strong>
           </div>
         )}
-      </div>
 
-      {/* =================================================
-          PRODUCT INFORMATION
-      ================================================= */}
+        {/* ===================================================
+            PRICE
+        =================================================== */}
 
-      <div className="product-info">
-        <div className="product-page-category">{product.category}</div>
-
-        <h1>{product.name}</h1>
-
-        {/* PRICE */}
-
-        <div className="product-page-price">
-          <span className="current-price">৳{price}</span>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            flexWrap: "wrap",
+            marginBottom: 15,
+          }}
+        >
+          <strong
+            style={{
+              fontSize: 30,
+            }}
+          >
+            ৳{finalPrice}
+          </strong>
 
           {hasOffer && (
             <>
-              <span className="regular-price">৳{regularPrice}</span>
+              <span
+                className="muted"
+                style={{
+                  textDecoration: "line-through",
+                  fontSize: 16,
+                }}
+              >
+                ৳{regularPrice}
+              </span>
 
-              <span className="save-badge">Save ৳{saving}</span>
+              <span
+                style={{
+                  padding: "5px 9px",
+                  borderRadius: 999,
+                  background: "#fff0f0",
+                  color: "#c62828",
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
+                -{discount}%
+              </span>
             </>
           )}
         </div>
 
-        {/* =================================================
-            COLOR VARIANTS
-        ================================================= */}
-
-        {variants.length > 0 && (
-          <div className="product-variants">
-            <div className="variant-title">
-              <strong>Choose Color</strong>
-
-              {selectedVariant && <span>{selectedVariant.color}</span>}
-            </div>
-
-            <div className="variant-list">
-              {variants.map((variant) => {
-                const variantStock = Number(variant.stock || 0);
-
-                const available = variantStock > 0;
-
-                const active = selectedVariantId === variant.id;
-
-                return (
-                  <button
-                    type="button"
-                    key={variant.id}
-                    disabled={!available}
-                    onClick={() => handleVariantChange(variant.id)}
-                    className={`product-variant ${active ? "active" : ""} ${
-                      !available ? "out-of-stock" : ""
-                    }`}
-                  >
-                    {/* COLOR IMAGE */}
-
-                    <span className="variant-image">
-                      {variant.images?.[0] ? (
-                        <img src={variant.images[0]} alt={variant.color} />
-                      ) : (
-                        <span>🎨</span>
-                      )}
-                    </span>
-
-                    <span className="variant-info">
-                      <strong>{variant.color}</strong>
-
-                      <small>
-                        {available
-                          ? `${variantStock} available`
-                          : "Out of stock"}
-                      </small>
-                    </span>
-
-                    {active && <span className="variant-check">✓</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* =================================================
+        {/* ===================================================
             STOCK
-        ================================================= */}
+        =================================================== */}
 
-        <div className="product-stock-status">
-          {inStock ? (
-            <>
-              <span className="stock-dot" />
-
-              <span>In stock</span>
-
-              <span className="stock-count">({stock} available)</span>
-            </>
+        <div
+          style={{
+            marginBottom: 18,
+          }}
+        >
+          {outOfStock ? (
+            <span
+              style={{
+                color: "#c62828",
+                fontWeight: 700,
+              }}
+            >
+              × Out of stock
+            </span>
           ) : (
-            <>
-              <span className="stock-dot out" />
-
-              <span>Currently out of stock</span>
-            </>
+            <span
+              style={{
+                color: stock <= 5 ? "#a66a00" : "#16753b",
+                fontWeight: 700,
+              }}
+            >
+              ✓ {stock} available
+            </span>
           )}
         </div>
 
-        {/* =================================================
+        {/* ===================================================
             DESCRIPTION
-        ================================================= */}
+        =================================================== */}
 
         {product.description && (
-          <div className="product-description">
-            <h3>About this product</h3>
-
-            <p>{product.description}</p>
+          <div
+            style={{
+              marginBottom: 20,
+            }}
+          >
+            <p
+              style={{
+                lineHeight: 1.75,
+                whiteSpace: "pre-line",
+              }}
+            >
+              {product.description}
+            </p>
           </div>
         )}
 
-        {/* =================================================
-            PRODUCT INFO
-        ================================================= */}
+        {/* ===================================================
+            COLOR / VARIANT SELECTOR
+        =================================================== */}
 
-        <div className="product-info-list">
-          {product.ageRange && (
-            <div className="info-row">
-              <span className="info-label">Recommended Age</span>
+        {hasVariants && (
+          <ProductColorSelector
+            variants={variants}
+            selectedVariantId={selectedVariant?.id}
+            onSelect={handleVariantSelect}
+          />
+        )}
 
-              <strong>{product.ageRange}</strong>
-            </div>
-          )}
+        {/* ===================================================
+            ADD TO CART
+        =================================================== */}
 
-          <div className="info-row">
-            <span className="info-label">Availability</span>
-
-            <strong className={inStock ? "available-text" : "unavailable-text"}>
-              {inStock ? "Available" : "Out of Stock"}
-            </strong>
-          </div>
-
-          {selectedVariant && (
-            <div className="info-row">
-              <span className="info-label">Selected Color</span>
-
-              <strong>{selectedVariant.color}</strong>
-            </div>
-          )}
+        <div
+          style={{
+            marginTop: 22,
+          }}
+        >
+          <AddToCart product={product} selectedVariant={selectedVariant} />
         </div>
 
-        {/* =================================================
-            FEATURES
-        ================================================= */}
+        {/* ===================================================
+            TRUST INFORMATION
+        =================================================== */}
 
-        {product.features && product.features.length > 0 && (
-          <div className="product-features">
+        <div
+          className="product-trust-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+            gap: 10,
+            marginTop: 22,
+          }}
+        >
+          {/* DELIVERY */}
+
+          <div
+            style={{
+              padding: 13,
+              border: "1px solid var(--line)",
+              borderRadius: 12,
+            }}
+          >
+            <strong>🚚 Fast Delivery</strong>
+
+            <small
+              className="muted"
+              style={{
+                display: "block",
+                marginTop: 4,
+              }}
+            >
+              Across Bangladesh
+            </small>
+          </div>
+
+          {/* QUALITY */}
+
+          <div
+            style={{
+              padding: 13,
+              border: "1px solid var(--line)",
+              borderRadius: 12,
+            }}
+          >
+            <strong>🛡️ Trusted Quality</strong>
+
+            <small
+              className="muted"
+              style={{
+                display: "block",
+                marginTop: 4,
+              }}
+            >
+              Carefully selected
+            </small>
+          </div>
+        </div>
+
+        {/* ===================================================
+            FEATURES
+        =================================================== */}
+
+        {Array.isArray(product.features) && product.features.length > 0 && (
+          <div
+            style={{
+              marginTop: 25,
+            }}
+          >
             <h3>Product Features</h3>
 
-            <ul>
-              {product.features.map((feature) => (
-                <li key={feature}>
-                  <span>✓</span>
-
-                  {feature}
-                </li>
+            <ul
+              style={{
+                paddingLeft: 20,
+                lineHeight: 1.9,
+              }}
+            >
+              {product.features.map((feature, index) => (
+                <li key={`${feature}-${index}`}>{feature}</li>
               ))}
             </ul>
           </div>
         )}
 
-        {/* =================================================
-            ADD TO CART
-        ================================================= */}
+        {/* ===================================================
+            PRODUCT STATUS
+        =================================================== */}
 
-        {inStock ? (
-          <div className="product-buy-area">
-            <AddToCart
-              product={product}
-              selectedVariant={selectedVariant || null}
-            />
+        {(product.newArrival || product.bestSeller || product.offer) && (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+              marginTop: 20,
+            }}
+          >
+            {product.newArrival && (
+              <span
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  background: "#eef2ff",
+                  color: "#3742fa",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                ✨ New Arrival
+              </span>
+            )}
+
+            {product.bestSeller && (
+              <span
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  background: "#fff7e6",
+                  color: "#a66a00",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                🔥 Best Seller
+              </span>
+            )}
+
+            {product.offer && (
+              <span
+                style={{
+                  padding: "6px 10px",
+                  borderRadius: 999,
+                  background: "#fff0f0",
+                  color: "#c62828",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                🏷️ Special Offer
+              </span>
+            )}
           </div>
-        ) : (
-          <button className="btn disabled-btn" disabled>
-            Currently Unavailable
-          </button>
         )}
-
-        {/* =================================================
-            TRUST
-        ================================================= */}
-
-        <div className="product-trust">
-          <div>
-            <span>🚚</span>
-
-            <div>
-              <strong>Fast Delivery</strong>
-
-              <small>3–5 working days</small>
-            </div>
-          </div>
-
-          <div>
-            <span>💳</span>
-
-            <div>
-              <strong>Easy Payment</strong>
-
-              <small>COD, bKash, Nagad & Bank</small>
-            </div>
-          </div>
-
-          <div>
-            <span>🛡️</span>
-
-            <div>
-              <strong>Trusted Quality</strong>
-
-              <small>Carefully selected products</small>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
