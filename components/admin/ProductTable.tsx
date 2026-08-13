@@ -48,6 +48,21 @@ export default function ProductTable({
   };
 
   /* =====================================================
+     CATEGORIES
+  ===================================================== */
+
+  const getCategories = (product: Product) => {
+    if (Array.isArray(product.categories)) {
+      return product.categories.filter(Boolean);
+    }
+
+    // Old product compatibility
+    const oldCategory = (product as Product & { category?: string }).category;
+
+    return oldCategory ? [oldCategory] : [];
+  };
+
+  /* =====================================================
      EMPTY
   ===================================================== */
 
@@ -59,6 +74,20 @@ export default function ProductTable({
         <h3>No Products Yet</h3>
 
         <p className="muted">Add your first product using the product form.</p>
+      </div>
+    );
+  }
+
+  /* =====================================================
+     LOADING
+  ===================================================== */
+
+  if (loading) {
+    return (
+      <div className="admin-product-loading">
+        <div className="admin-product-loading-icon">⏳</div>
+
+        <strong>Loading products...</strong>
       </div>
     );
   }
@@ -87,7 +116,7 @@ export default function ProductTable({
             <th>Price</th>
             <th>Stock</th>
             <th>Colors</th>
-            <th>Featured</th>
+            <th>Tags</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -100,31 +129,38 @@ export default function ProductTable({
               ? product.variants
               : [];
 
+            const categories = getCategories(product);
+
             const stock = getTotalStock(product);
 
             const price = getPrice(product);
 
+            const regularPrice = Number(product.regularPrice || 0);
+
             const hasOffer =
               product.offerPrice != null &&
-              Number(product.offerPrice) < Number(product.regularPrice);
+              Number(product.offerPrice) > 0 &&
+              Number(product.offerPrice) < regularPrice;
 
             return (
-              <tr key={String(product._id)}>
+              <tr key={String(product._id || product.slug)}>
                 {/* =================================================
                     PRODUCT
                 ================================================= */}
 
                 <td className="product-cell">
                   <div className="product-info">
-                    {image ? (
-                      <img
-                        src={image}
-                        alt={product.name}
-                        className="product-thumb"
-                      />
-                    ) : (
-                      <div className="product-thumb-placeholder">🧸</div>
-                    )}
+                    <div className="product-thumb-wrap">
+                      {image ? (
+                        <img
+                          src={image}
+                          alt={product.name}
+                          className="product-thumb"
+                        />
+                      ) : (
+                        <div className="product-thumb-placeholder">🧸</div>
+                      )}
+                    </div>
 
                     <div className="product-name-wrap">
                       <strong className="product-name">{product.name}</strong>
@@ -140,21 +176,31 @@ export default function ProductTable({
                     CATEGORY
                 ================================================= */}
 
-                <td>
-                  <span className="product-category">{product.category}</span>
+                <td className="category-cell">
+                  {categories.length > 0 ? (
+                    <div className="admin-category-list">
+                      {categories.map((category) => (
+                        <span key={category} className="admin-category-pill">
+                          {category}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="muted">No category</span>
+                  )}
                 </td>
 
                 {/* =================================================
                     PRICE
                 ================================================= */}
 
-                <td>
+                <td className="price-cell">
                   <div className="product-price">
                     <strong>৳{price}</strong>
 
                     {hasOffer && (
                       <small className="product-old-price">
-                        ৳{product.regularPrice}
+                        ৳{regularPrice}
                       </small>
                     )}
                   </div>
@@ -164,7 +210,7 @@ export default function ProductTable({
                     STOCK
                 ================================================= */}
 
-                <td>
+                <td className="stock-cell">
                   <div className="product-stock">
                     <strong
                       className={
@@ -192,13 +238,13 @@ export default function ProductTable({
                     COLORS
                 ================================================= */}
 
-                <td>
+                <td className="colors-cell">
                   {variants.length > 0 ? (
                     <div className="product-colors">
                       <strong className="color-count">{variants.length}</strong>
 
                       <div className="color-list">
-                        {variants.slice(0, 4).map((variant) => (
+                        {variants.slice(0, 3).map((variant) => (
                           <span
                             key={variant.id}
                             title={variant.color}
@@ -208,35 +254,52 @@ export default function ProductTable({
                           </span>
                         ))}
 
-                        {variants.length > 4 && (
-                          <span className="color-more muted">
-                            +{variants.length - 4}
+                        {variants.length > 3 && (
+                          <span className="color-more">
+                            +{variants.length - 3}
                           </span>
                         )}
                       </div>
                     </div>
                   ) : (
-                    <span className="muted">No variants</span>
+                    <span className="muted">No colors</span>
                   )}
                 </td>
 
                 {/* =================================================
-                    FEATURED
+                    TAGS
                 ================================================= */}
 
-                <td>
-                  {product.featured ? (
-                    <span className="featured-badge">⭐ Featured</span>
-                  ) : (
-                    <span className="muted">—</span>
-                  )}
+                <td className="tags-cell">
+                  <div className="product-tags">
+                    {product.bestSeller && (
+                      <span className="admin-tag best">🔥 Best Seller</span>
+                    )}
+
+                    {product.newArrival && (
+                      <span className="admin-tag new">✨ New Arrival</span>
+                    )}
+
+                    {product.offer && (
+                      <span className="admin-tag offer">🏷️ Offer</span>
+                    )}
+
+                    {product.featured && (
+                      <span className="admin-tag featured">⭐ Featured</span>
+                    )}
+
+                    {!product.bestSeller &&
+                      !product.newArrival &&
+                      !product.offer &&
+                      !product.featured && <span className="muted">—</span>}
+                  </div>
                 </td>
 
                 {/* =================================================
                     ACTIONS
                 ================================================= */}
 
-                <td>
+                <td className="actions-cell">
                   <div className="product-actions">
                     <button
                       type="button"

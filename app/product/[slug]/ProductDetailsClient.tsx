@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 
 import { Product, ProductVariant } from "@/models/types";
 
@@ -35,13 +34,15 @@ export default function ProductDetailsClient({
   const offerPrice =
     product.offerPrice != null ? Number(product.offerPrice) : null;
 
-  const finalPrice =
-    offerPrice !== null && offerPrice > 0 && offerPrice < regularPrice
-      ? offerPrice
-      : regularPrice;
-
   const hasOffer =
     offerPrice !== null && offerPrice > 0 && offerPrice < regularPrice;
+
+  const finalPrice = hasOffer ? offerPrice : regularPrice;
+
+  const discount =
+    hasOffer && regularPrice > 0
+      ? Math.round(((regularPrice - offerPrice!) / regularPrice) * 100)
+      : 0;
 
   /* =========================================================
      STOCK
@@ -54,6 +55,24 @@ export default function ProductDetailsClient({
     : Number(product.stock || 0);
 
   const outOfStock = stock <= 0;
+
+  /* =========================================================
+     CATEGORIES
+  ========================================================= */
+
+  const categories = Array.isArray(product.categories)
+    ? product.categories
+    : [];
+
+  /* =========================================================
+     PRODUCT STATUS
+  ========================================================= */
+
+  const isBestSeller = Boolean(product.bestSeller);
+
+  const isNewArrival = Boolean(product.newArrival);
+
+  const isOffer = Boolean(product.offer) || hasOffer;
 
   /* =========================================================
      VARIANT SELECT
@@ -90,11 +109,98 @@ export default function ProductDetailsClient({
       =================================================== */}
 
       <div>
-        {/* CATEGORY */}
+        {/* =================================================
+            PRODUCT BADGES
+        ================================================= */}
 
-        <span className="eyebrow">{product.category}</span>
+        {(isOffer || isBestSeller || isNewArrival) && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 7,
+              marginBottom: 10,
+            }}
+          >
+            {isOffer && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "5px 9px",
+                  borderRadius: 999,
+                  background: "#fff0f0",
+                  color: "#c62828",
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
+                🏷️ Offer
+              </span>
+            )}
 
-        {/* NAME */}
+            {isBestSeller && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "5px 9px",
+                  borderRadius: 999,
+                  background: "#fff7e6",
+                  color: "#a15c00",
+                  border: "1px solid #ffe0a3",
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
+                🔥 Best Seller
+              </span>
+            )}
+
+            {isNewArrival && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "5px 9px",
+                  borderRadius: 999,
+                  background: "#eef6ff",
+                  color: "#2864a8",
+                  border: "1px solid #cfe5ff",
+                  fontSize: 11,
+                  fontWeight: 800,
+                }}
+              >
+                ✨ New Arrival
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* =================================================
+            CATEGORIES
+        ================================================= */}
+
+        {categories.length > 0 && (
+          <div
+            style={{
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 6,
+              marginBottom: 8,
+            }}
+          >
+            {categories.map((category, index) => (
+              <span key={`${category}-${index}`} className="eyebrow">
+                {category}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* =================================================
+            NAME
+        ================================================= */}
 
         <h1
           style={{
@@ -106,7 +212,9 @@ export default function ProductDetailsClient({
           {product.name}
         </h1>
 
-        {/* AGE */}
+        {/* =================================================
+            AGE
+        ================================================= */}
 
         {product.ageRange && (
           <div
@@ -163,7 +271,7 @@ export default function ProductDetailsClient({
                   fontWeight: 800,
                 }}
               >
-                SALE
+                -{discount}%
               </span>
             </>
           )}

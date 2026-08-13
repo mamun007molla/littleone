@@ -4,24 +4,59 @@ import { Product } from "@/models/types";
 import { ShoppingCart, ArrowUpRight } from "lucide-react";
 
 export default function ProductCard({ p }: { p: Product }) {
-  const regularPrice = Number(p.regularPrice);
+  /* =========================================================
+     PRICE
+  ========================================================= */
+
+  const regularPrice = Number(p.regularPrice || 0);
+
   const offerPrice = p.offerPrice != null ? Number(p.offerPrice) : null;
 
-  const hasOffer = offerPrice !== null && offerPrice < regularPrice;
+  const hasOffer =
+    offerPrice !== null && offerPrice > 0 && offerPrice < regularPrice;
 
   const price = hasOffer ? offerPrice : regularPrice;
 
-  const discount = hasOffer
-    ? Math.round(((regularPrice - offerPrice) / regularPrice) * 100)
-    : 0;
+  const discount =
+    hasOffer && regularPrice > 0
+      ? Math.round(((regularPrice - offerPrice) / regularPrice) * 100)
+      : 0;
 
-  const inStock = Number(p.stock) > 0;
+  /* =========================================================
+     STOCK
+  ========================================================= */
+
+  const inStock = Number(p.stock || 0) > 0;
+
+  /* =========================================================
+     CATEGORIES
+  ========================================================= */
+
+  const categories = Array.isArray(p.categories) ? p.categories : [];
+
+  const categoryLabel = categories.length > 0 ? categories[0] : "Baby Toys";
+
+  /* =========================================================
+     PRODUCT TAGS
+  ========================================================= */
+
+  const isBestSeller = Boolean(p.bestSeller);
+
+  const isNewArrival = Boolean(p.newArrival);
+
+  /*
+   * Offer is considered active
+   * when both the flag and
+   * discounted price exist.
+   */
+
+  const isOffer = Boolean(p.offer) || hasOffer;
 
   return (
     <Link href={`/product/${p.slug}`} className="product-card">
-      {/* =========================
+      {/* =====================================================
           IMAGE
-      ========================= */}
+      ===================================================== */}
 
       <div className="product-card-image">
         {p.images?.[0] ? (
@@ -35,35 +70,64 @@ export default function ProductCard({ p }: { p: Product }) {
         ) : (
           <div className="product-card-empty-image">
             <span>🧸</span>
+
             <small>No image</small>
           </div>
         )}
 
-        {/* OFFER */}
+        {/* =================================================
+            BADGES
+        ================================================= */}
 
-        {hasOffer && <span className="product-offer-badge">-{discount}%</span>}
+        <div className="product-card-badges">
+          {hasOffer && (
+            <span className="product-offer-badge">-{discount}%</span>
+          )}
 
-        {/* STOCK */}
+          {!hasOffer && isOffer && (
+            <span className="product-offer-badge">OFFER</span>
+          )}
+
+          {isBestSeller && (
+            <span className="product-best-seller-badge">🔥 Best Seller</span>
+          )}
+
+          {isNewArrival && (
+            <span className="product-new-arrival-badge">✨ New</span>
+          )}
+        </div>
+
+        {/* =================================================
+            OUT OF STOCK
+        ================================================= */}
 
         {!inStock && <div className="product-out-stock">Out of Stock</div>}
 
-        {/* TOP ACTION */}
+        {/* =================================================
+            TOP ACTION
+        ================================================= */}
 
         <div className="product-card-action">
           <ArrowUpRight size={16} />
         </div>
       </div>
 
-      {/* =========================
+      {/* =====================================================
           CONTENT
-      ========================= */}
+      ===================================================== */}
 
       <div className="product-card-body">
-        <span className="product-card-category">{p.category}</span>
+        {/* CATEGORY */}
+
+        <span className="product-card-category">{categoryLabel}</span>
+
+        {/* PRODUCT NAME */}
 
         <h3 className="product-card-title">{p.name}</h3>
 
-        {/* PRICE */}
+        {/* =================================================
+            PRICE
+        ================================================= */}
 
         <div className="product-card-price">
           <strong>৳{price}</strong>
@@ -71,7 +135,9 @@ export default function ProductCard({ p }: { p: Product }) {
           {hasOffer && <span>৳{regularPrice}</span>}
         </div>
 
-        {/* BOTTOM */}
+        {/* =================================================
+            BOTTOM
+        ================================================= */}
 
         <div className="product-card-footer">
           <div className="product-stock">

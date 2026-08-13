@@ -34,28 +34,58 @@ export type ProductVariant = {
 export type Product = {
   _id?: string;
 
+  /**
+   * Product name
+   */
   name: string;
 
+  /**
+   * URL slug
+   */
   slug: string;
 
-  category: string;
+  /**
+   * One product can belong to multiple categories.
+   *
+   * Example:
+   * [
+   *   "Baby & Toddler Toys",
+   *   "Musical & Dancing Toys"
+   * ]
+   */
+  categories: string[];
 
+  /**
+   * Product description
+   */
   description: string;
 
+  /**
+   * Product features
+   */
   features: string[];
 
+  /**
+   * Regular/original price
+   */
   regularPrice: number;
 
+  /**
+   * Optional discounted price
+   */
   offerPrice?: number;
 
   /**
-   * Total stock.
+   * Total product stock.
    *
-   * If variants exist, this is automatically
-   * calculated from all variant stocks.
+   * If variants exist, this should be calculated
+   * from the variant stocks.
    */
   stock: number;
 
+  /**
+   * Recommended age
+   */
   ageRange?: string;
 
   /**
@@ -68,7 +98,33 @@ export type Product = {
    */
   variants?: ProductVariant[];
 
+  /* =====================================================
+     PRODUCT TAGS / HOMEPAGE FLAGS
+  ===================================================== */
+
+  /**
+   * Product has an active offer
+   */
+  offer?: boolean;
+
+  /**
+   * Show as New Arrival
+   */
+  newArrival?: boolean;
+
+  /**
+   * Show in Best Sellers section
+   */
+  bestSeller?: boolean;
+
+  /**
+   * Show as Featured Product
+   */
   featured?: boolean;
+
+  /* =====================================================
+     TIMESTAMPS
+  ===================================================== */
 
   createdAt?: string;
 
@@ -80,12 +136,18 @@ export type Product = {
 ========================================================= */
 
 export type CartItem = Product & {
+  /**
+   * Cart item always has an ID
+   */
   _id: string;
 
+  /**
+   * Quantity selected by customer
+   */
   quantity: number;
 
   /**
-   * Selected color variant
+   * Selected color variant ID
    */
   variantId?: string;
 
@@ -95,7 +157,7 @@ export type CartItem = Product & {
   variantColor?: string;
 
   /**
-   * Image of selected variant
+   * Selected variant image
    */
   variantImage?: string;
 };

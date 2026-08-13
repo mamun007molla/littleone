@@ -6,11 +6,17 @@ import ProductVariants from "./ProductVariants";
 
 type ProductFormProps = {
   form: Product;
+
   setForm: React.Dispatch<React.SetStateAction<Product>>;
+
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+
   editing: boolean;
+
   saving?: boolean;
+
   categories: string[];
+
   onCancel: () => void;
 };
 
@@ -27,9 +33,9 @@ export default function ProductForm({
 
   const imageInputRef = useRef<HTMLInputElement | null>(null);
 
-  /* =====================================================
+  /* =========================================================
      BASIC FIELD UPDATE
-  ===================================================== */
+  ========================================================= */
 
   const updateField = <K extends keyof Product>(
     field: K,
@@ -41,9 +47,35 @@ export default function ProductForm({
     }));
   };
 
-  /* =====================================================
+  /* =========================================================
+     CATEGORIES
+  ========================================================= */
+
+  const selectedCategories = Array.isArray(form.categories)
+    ? form.categories
+    : [];
+
+  const toggleCategory = (category: string) => {
+    setForm((current) => {
+      const currentCategories = Array.isArray(current.categories)
+        ? current.categories
+        : [];
+
+      const exists = currentCategories.includes(category);
+
+      return {
+        ...current,
+
+        categories: exists
+          ? currentCategories.filter((item) => item !== category)
+          : [...currentCategories, category],
+      };
+    });
+  };
+
+  /* =========================================================
      FEATURES
-  ===================================================== */
+  ========================================================= */
 
   const featuresText = Array.isArray(form.features)
     ? form.features.join("\n")
@@ -58,16 +90,18 @@ export default function ProductForm({
     updateField("features", features);
   };
 
-  /* =====================================================
+  /* =========================================================
      VARIANTS
-  ===================================================== */
+  ========================================================= */
 
   const variants = Array.isArray(form.variants) ? form.variants : [];
 
   const updateVariants = (nextVariants: ProductVariant[]) => {
     setForm((current) => ({
       ...current,
+
       variants: nextVariants,
+
       stock:
         nextVariants.length > 0
           ? nextVariants.reduce(
@@ -78,36 +112,88 @@ export default function ProductForm({
     }));
   };
 
-  /* =====================================================
-     CLOUDINARY UPLOAD
-  ===================================================== */
+  /* =========================================================
+     CLOUDINARY DIRECT UPLOAD
+  ========================================================= */
 
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
-      const formData = new FormData();
+      /* =====================================================
+         GET CLOUDINARY SIGNATURE
+      ===================================================== */
 
-      formData.append("file", file);
-
-      const response = await fetch("/api/upload", {
+      const signatureResponse = await fetch("/api/cloudinary/sign", {
         method: "POST",
-        body: formData,
+
+        headers: {
+          "Content-Type": "application/json",
+        },
+
+        body: JSON.stringify({
+          resourceType: "image",
+        }),
+      });
+
+      const signatureData = await signatureResponse.json();
+
+      if (!signatureResponse.ok) {
+        console.error("Cloudinary signature error:", signatureData);
+
+        alert(signatureData?.error || "Could not prepare image upload.");
+
+        return null;
+      }
+
+      /* =====================================================
+         CLOUDINARY UPLOAD URL
+      ===================================================== */
+
+      const uploadUrl =
+        `https://api.cloudinary.com/v1_1/` +
+        `${signatureData.cloudName}/image/upload`;
+
+      /* =====================================================
+         FORM DATA
+      ===================================================== */
+
+      const uploadData = new FormData();
+
+      uploadData.append("file", file);
+
+      uploadData.append("api_key", signatureData.apiKey);
+
+      uploadData.append("timestamp", String(signatureData.timestamp));
+
+      uploadData.append("signature", signatureData.signature);
+
+      uploadData.append("folder", signatureData.folder);
+
+      /* =====================================================
+         DIRECT CLOUDINARY UPLOAD
+      ===================================================== */
+
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        body: uploadData,
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        alert(data?.error || "Image upload failed.");
+        console.error("Cloudinary image upload error:", data);
+
+        alert(data?.error?.message || "Image upload failed.");
 
         return null;
       }
 
-      if (!data?.url) {
-        alert("Upload completed but no URL was returned.");
+      if (!data?.secure_url) {
+        alert("Upload completed but no image URL was returned.");
 
         return null;
       }
 
-      return String(data.url);
+      return String(data.secure_url);
     } catch (error) {
       console.error("Image upload error:", error);
 
@@ -117,9 +203,9 @@ export default function ProductForm({
     }
   };
 
-  /* =====================================================
+  /* =========================================================
      MAIN IMAGE UPLOAD
-  ===================================================== */
+  ========================================================= */
 
   const handleMainImageUpload = async (files: FileList | null) => {
     if (!files || files.length === 0) {
@@ -132,11 +218,15 @@ export default function ProductForm({
       const uploadedUrls: string[] = [];
 
       for (const file of Array.from(files)) {
+        /* IMAGE TYPE */
+
         if (!file.type.startsWith("image/")) {
           alert(`${file.name} is not an image file.`);
 
           continue;
         }
+
+        /* IMAGE SIZE */
 
         const maxSize = 10 * 1024 * 1024;
 
@@ -146,6 +236,8 @@ export default function ProductForm({
           continue;
         }
 
+        /* CLOUDINARY */
+
         const url = await uploadImage(file);
 
         if (url) {
@@ -153,9 +245,12 @@ export default function ProductForm({
         }
       }
 
+      /* SAVE URLS */
+
       if (uploadedUrls.length > 0) {
         setForm((current) => ({
           ...current,
+
           images: [...(current.images || []), ...uploadedUrls],
         }));
       }
@@ -168,30 +263,45 @@ export default function ProductForm({
     }
   };
 
-  /* =====================================================
+  /* =========================================================
      REMOVE MAIN IMAGE
-  ===================================================== */
+  ========================================================= */
 
   const removeMainImage = (imageIndex: number) => {
     setForm((current) => ({
       ...current,
+
       images: (current.images || []).filter((_, index) => index !== imageIndex),
     }));
   };
 
-  /* =====================================================
+  /* =========================================================
      SUBMIT
-  ===================================================== */
+  ========================================================= */
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
+    /* =====================================================
+       CATEGORY VALIDATION
+    ===================================================== */
+
+    if (selectedCategories.length === 0) {
+      alert("Please select at least one category.");
+
+      return;
+    }
+
+    /* =====================================================
+       SUBMIT
+    ===================================================== */
+
     onSubmit(e);
   };
 
-  /* =====================================================
+  /* =========================================================
      UI
-  ===================================================== */
+  ========================================================= */
 
   return (
     <form onSubmit={handleSubmit} className="admin-product-form">
@@ -222,7 +332,7 @@ export default function ProductForm({
             }}
           >
             {editing
-              ? "Update product information, colors, images and video."
+              ? "Update product information, categories, colors, images and video."
               : "Add a new product to your shop."}
           </p>
         </div>
@@ -254,6 +364,8 @@ export default function ProductForm({
           </div>
         </div>
 
+        {/* PRODUCT NAME */}
+
         <label>
           Product Name
           <input
@@ -264,6 +376,8 @@ export default function ProductForm({
             required
           />
         </label>
+
+        {/* SLUG */}
 
         <label>
           Slug
@@ -282,22 +396,58 @@ export default function ProductForm({
           <small className="muted">Example: cute-panda-toy</small>
         </label>
 
-        <label>
-          Category
-          <select
-            value={form.category || ""}
-            onChange={(e) => updateField("category", e.target.value)}
-            required
-          >
-            <option value="">Select category</option>
+        {/* =================================================
+            MULTIPLE CATEGORIES
+        ================================================= */}
 
-            {categories.map((category) => (
-              <option key={category} value={category}>
-                {category}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="admin-category-field">
+          <div className="admin-field-heading">
+            <strong>Categories</strong>
+
+            <span className="muted">Select one or more</span>
+          </div>
+
+          <div className="admin-category-grid">
+            {categories.map((category) => {
+              const selected = selectedCategories.includes(category);
+
+              return (
+                <label
+                  key={category}
+                  className={`admin-category-option ${
+                    selected ? "selected" : ""
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selected}
+                    onChange={() => toggleCategory(category)}
+                  />
+
+                  <span className="admin-category-check">
+                    {selected ? "✓" : ""}
+                  </span>
+
+                  <span className="admin-category-name">{category}</span>
+                </label>
+              );
+            })}
+          </div>
+
+          {selectedCategories.length > 0 && (
+            <div className="admin-selected-categories">
+              <span>Selected:</span>
+
+              {selectedCategories.map((category) => (
+                <span key={category} className="admin-selected-category">
+                  {category}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* AGE */}
 
         <label>
           Recommended Age
@@ -309,6 +459,8 @@ export default function ProductForm({
           />
         </label>
 
+        {/* DESCRIPTION */}
+
         <label>
           Description
           <textarea
@@ -319,6 +471,8 @@ export default function ProductForm({
             required
           />
         </label>
+
+        {/* FEATURES */}
 
         <label>
           Product Features
@@ -338,7 +492,7 @@ Safe material`}
       </div>
 
       {/* =================================================
-          PRICING
+          PRICING & STOCK
       ================================================= */}
 
       <div className="admin-form-section">
@@ -359,6 +513,8 @@ Safe material`}
             gap: 12,
           }}
         >
+          {/* REGULAR PRICE */}
+
           <label>
             Regular Price
             <input
@@ -372,6 +528,8 @@ Safe material`}
               required
             />
           </label>
+
+          {/* OFFER PRICE */}
 
           <label>
             Offer Price
@@ -387,8 +545,13 @@ Safe material`}
               }
               placeholder="599"
             />
+            <small className="muted">
+              Leave empty if there is no discount.
+            </small>
           </label>
         </div>
+
+        {/* STOCK */}
 
         <label>
           Main Stock
@@ -410,6 +573,110 @@ Safe material`}
       </div>
 
       {/* =================================================
+          PRODUCT STATUS
+      ================================================= */}
+
+      <div className="admin-form-section">
+        <div className="admin-form-section-title">
+          <span>🏷️</span>
+
+          <div>
+            <h3>Product Status</h3>
+
+            <p className="muted">
+              Choose where this product should appear on your website.
+            </p>
+          </div>
+        </div>
+
+        <div className="admin-product-status-grid">
+          {/* OFFER */}
+
+          <label
+            className={`admin-status-option ${form.offer ? "selected" : ""}`}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(form.offer)}
+              onChange={(e) => updateField("offer", e.target.checked)}
+            />
+
+            <span className="admin-status-icon">🏷️</span>
+
+            <span>
+              <strong>Offer</strong>
+
+              <small>Show in Offers</small>
+            </span>
+          </label>
+
+          {/* NEW ARRIVAL */}
+
+          <label
+            className={`admin-status-option ${
+              form.newArrival ? "selected" : ""
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(form.newArrival)}
+              onChange={(e) => updateField("newArrival", e.target.checked)}
+            />
+
+            <span className="admin-status-icon">✨</span>
+
+            <span>
+              <strong>New Arrival</strong>
+
+              <small>Show in New Arrivals</small>
+            </span>
+          </label>
+
+          {/* BEST SELLER */}
+
+          <label
+            className={`admin-status-option ${
+              form.bestSeller ? "selected" : ""
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(form.bestSeller)}
+              onChange={(e) => updateField("bestSeller", e.target.checked)}
+            />
+
+            <span className="admin-status-icon">🔥</span>
+
+            <span>
+              <strong>Best Seller</strong>
+
+              <small>Show on homepage</small>
+            </span>
+          </label>
+
+          {/* FEATURED */}
+
+          <label
+            className={`admin-status-option ${form.featured ? "selected" : ""}`}
+          >
+            <input
+              type="checkbox"
+              checked={Boolean(form.featured)}
+              onChange={(e) => updateField("featured", e.target.checked)}
+            />
+
+            <span className="admin-status-icon">⭐</span>
+
+            <span>
+              <strong>Featured</strong>
+
+              <small>Show in featured sections</small>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* =================================================
           MAIN PRODUCT IMAGES
       ================================================= */}
 
@@ -424,7 +691,7 @@ Safe material`}
           </div>
         </div>
 
-        {/* HIDDEN FILE INPUT */}
+        {/* HIDDEN INPUT */}
 
         <input
           ref={imageInputRef}
@@ -435,7 +702,7 @@ Safe material`}
           onChange={(e) => handleMainImageUpload(e.target.files)}
         />
 
-        {/* UPLOAD BUTTON */}
+        {/* UPLOAD */}
 
         <div className="admin-main-upload-area">
           <button
@@ -488,57 +755,10 @@ Safe material`}
       </div>
 
       {/* =================================================
-          FEATURED
-      ================================================= */}
-
-      <div className="admin-form-section">
-        <label
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            cursor: "pointer",
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={Boolean(form.featured)}
-            onChange={(e) => updateField("featured", e.target.checked)}
-            style={{
-              width: 18,
-              height: 18,
-            }}
-          />
-
-          <span>
-            <strong>Featured Product</strong>
-
-            <small
-              className="muted"
-              style={{
-                display: "block",
-                marginTop: 2,
-              }}
-            >
-              Show this product in featured sections.
-            </small>
-          </span>
-        </label>
-      </div>
-
-      {/* =================================================
           FORM ACTIONS
       ================================================= */}
 
-      <div
-        style={{
-          display: "flex",
-          gap: 10,
-          justifyContent: "flex-end",
-          flexWrap: "wrap",
-          marginTop: 20,
-        }}
-      >
+      <div className="admin-product-form-actions">
         {editing && (
           <button
             type="button"

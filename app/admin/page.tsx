@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 
 import { Product, ProductVariant } from "@/models/types";
 import { CATEGORIES } from "@/lib/constants";
@@ -17,7 +18,7 @@ import OrderDetails from "@/components/admin/OrderDetails";
 const EMPTY_PRODUCT: Product = {
   name: "",
   slug: "",
-  category: "",
+  categories: [],
   description: "",
   features: [],
   regularPrice: 0,
@@ -25,9 +26,124 @@ const EMPTY_PRODUCT: Product = {
   stock: 0,
   ageRange: "",
   images: [],
-  featured: false,
   variants: [],
+  offer: false,
+  newArrival: false,
+  bestSeller: false,
+  featured: false,
 };
+
+/* =========================================================
+   NORMALIZE PRODUCT
+========================================================= */
+
+function normalizeProduct(product: any): Product {
+  let categories: string[] = [];
+
+  /*
+   * New format:
+   * categories: ["Baby Toys", "Gift Items"]
+   */
+
+  if (Array.isArray(product?.categories)) {
+    categories = product.categories.filter(
+      (item: unknown): item is string =>
+        typeof item === "string" && item.trim().length > 0,
+    );
+  } else if (typeof product?.category === "string" && product.category.trim()) {
+
+  /*
+   * Old format compatibility:
+   * category: "Baby Toys"
+   */
+    categories = [product.category.trim()];
+  }
+
+  /* =====================================================
+     VARIANTS
+  ===================================================== */
+
+  const variants: ProductVariant[] = Array.isArray(product?.variants)
+    ? product.variants.map((variant: any) => ({
+        id: String(variant?.id || ""),
+        color: String(variant?.color || ""),
+        images: Array.isArray(variant?.images)
+          ? variant.images.map((image: any) => String(image))
+          : [],
+        video: variant?.video ? String(variant.video) : undefined,
+        stock: Number(variant?.stock || 0),
+      }))
+    : [];
+
+  /* =====================================================
+     TOTAL VARIANT STOCK
+  ===================================================== */
+
+  const totalVariantStock = variants.reduce(
+    (total, variant) => total + Number(variant.stock || 0),
+    0,
+  );
+
+  /* =====================================================
+     RETURN NORMALIZED PRODUCT
+  ===================================================== */
+
+  return {
+    ...product,
+
+    _id: product?._id ? String(product._id) : undefined,
+
+    name: String(product?.name || ""),
+
+    slug: String(product?.slug || ""),
+
+    categories,
+
+    description: String(product?.description || ""),
+
+    features: Array.isArray(product?.features)
+      ? product.features.map((feature: any) => String(feature))
+      : [],
+
+    regularPrice: Number(product?.regularPrice || 0),
+
+    offerPrice:
+      product?.offerPrice !== undefined &&
+      product?.offerPrice !== null &&
+      product?.offerPrice !== ""
+        ? Number(product.offerPrice)
+        : undefined,
+
+    images: Array.isArray(product?.images)
+      ? product.images.map((image: any) => String(image))
+      : [],
+
+    variants,
+
+    stock:
+      variants.length > 0 ? totalVariantStock : Number(product?.stock || 0),
+
+    ageRange: product?.ageRange ? String(product.ageRange) : "",
+
+    offer: Boolean(product?.offer),
+
+    newArrival: Boolean(product?.newArrival),
+
+    bestSeller: Boolean(product?.bestSeller),
+
+    featured: Boolean(product?.featured),
+
+    createdAt:
+      product?.createdAt instanceof Date
+        ? product.createdAt.toISOString()
+        : product?.createdAt,
+
+    updatedAt:
+      product?.updatedAt instanceof Date
+        ? product.updatedAt.toISOString()
+        : product?.updatedAt,
+  };
+}
 
 /* =========================================================
    ADMIN PAGE
@@ -45,7 +161,7 @@ export default function AdminPage() {
   const [authError, setAuthError] = useState("");
 
   /* =======================================================
-     PRODUCT
+     PRODUCTS
   ======================================================= */
 
   const [products, setProducts] = useState<Product[]>([]);
@@ -121,7 +237,11 @@ export default function AdminPage() {
         throw new Error(data?.error || "Failed to load products.");
       }
 
-      setProducts(Array.isArray(data?.products) ? data.products : []);
+      const rawProducts = Array.isArray(data?.products) ? data.products : [];
+
+      const normalizedProducts = rawProducts.map(normalizeProduct);
+
+      setProducts(normalizedProducts);
     } catch (error) {
       console.error("Admin products error:", error);
     } finally {
@@ -159,25 +279,15 @@ export default function AdminPage() {
      LOGIN
   ======================================================= */
 
-  const login = (e: React.FormEvent<HTMLFormElement>) => {
+  const login = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     setAuthError("");
-
-    /*
-     * IMPORTANT:
-     * Keep the same admin password that your
-     * existing project uses.
-     *
-     * Change this value if your current
-     * admin password is different.
-     */
 
     const ADMIN_PASSWORD = "admin123";
 
     if (password !== ADMIN_PASSWORD) {
       setAuthError("Incorrect admin password.");
-
       return;
     }
 
@@ -207,9 +317,22 @@ export default function AdminPage() {
   const resetForm = () => {
     setForm({
       ...EMPTY_PRODUCT,
+
+      categories: [],
+
       features: [],
+
       images: [],
+
       variants: [],
+
+      offer: false,
+
+      newArrival: false,
+
+      bestSeller: false,
+
+      featured: false,
     });
 
     setEditingId(null);
@@ -220,14 +343,26 @@ export default function AdminPage() {
   ======================================================= */
 
   const editProduct = (product: Product) => {
+    const normalized = normalizeProduct(product);
+
     setForm({
-      ...product,
+      ...normalized,
 
-      features: Array.isArray(product.features) ? product.features : [],
+      categories: normalized.categories || [],
 
-      images: Array.isArray(product.images) ? product.images : [],
+      features: Array.isArray(normalized.features) ? normalized.features : [],
 
-      variants: Array.isArray(product.variants) ? product.variants : [],
+      images: Array.isArray(normalized.images) ? normalized.images : [],
+
+      variants: Array.isArray(normalized.variants) ? normalized.variants : [],
+
+      offer: Boolean(normalized.offer),
+
+      newArrival: Boolean(normalized.newArrival),
+
+      bestSeller: Boolean(normalized.bestSeller),
+
+      featured: Boolean(normalized.featured),
     });
 
     setEditingId(String(product._id));
@@ -244,7 +379,7 @@ export default function AdminPage() {
      SAVE PRODUCT
   ======================================================= */
 
-  const saveProduct = async (e: React.FormEvent<HTMLFormElement>) => {
+  const saveProduct = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     setSavingProduct(true);
@@ -252,41 +387,83 @@ export default function AdminPage() {
     try {
       const variants = Array.isArray(form.variants) ? form.variants : [];
 
-      /*
-       * Calculate total stock from variants.
-       */
+      /* =================================================
+         TOTAL VARIANT STOCK
+      ================================================= */
 
       const totalVariantStock = variants.reduce(
         (total, variant) => total + Number(variant.stock || 0),
         0,
       );
 
+      /* =================================================
+         CATEGORIES
+      ================================================= */
+
+      const categories = Array.isArray(form.categories)
+        ? form.categories
+            .filter(
+              (category): category is string =>
+                typeof category === "string" && category.trim().length > 0,
+            )
+            .map((category) => category.trim())
+        : [];
+
+      if (categories.length === 0) {
+        alert("Please select at least one category.");
+
+        setSavingProduct(false);
+
+        return;
+      }
+
+      /* =================================================
+         PAYLOAD
+      ================================================= */
+
       const payload = {
         name: form.name.trim(),
 
         slug: form.slug.trim(),
 
-        category: form.category,
+        categories,
 
         description: form.description.trim(),
 
-        features: form.features || [],
+        features: Array.isArray(form.features) ? form.features : [],
 
         regularPrice: Number(form.regularPrice || 0),
 
-        offerPrice: form.offerPrice,
+        offerPrice:
+          form.offerPrice !== undefined && form.offerPrice !== null
+            ? Number(form.offerPrice)
+            : undefined,
 
         stock:
           variants.length > 0 ? totalVariantStock : Number(form.stock || 0),
 
         ageRange: form.ageRange || "",
 
-        images: form.images || [],
+        images: Array.isArray(form.images) ? form.images : [],
 
         variants,
 
+        /* =============================================
+           PRODUCT FLAGS
+        ============================================= */
+
+        offer: Boolean(form.offer),
+
+        newArrival: Boolean(form.newArrival),
+
+        bestSeller: Boolean(form.bestSeller),
+
         featured: Boolean(form.featured),
       };
+
+      /* =================================================
+         API
+      ================================================= */
 
       const url = editingId ? `/api/products/${editingId}` : "/api/products";
 
@@ -308,21 +485,17 @@ export default function AdminPage() {
         throw new Error(data?.error || "Failed to save product.");
       }
 
-      /*
-       * Refresh products.
-       */
+      /* =================================================
+         REFRESH PRODUCTS
+      ================================================= */
 
       await loadProducts();
 
-      /*
-       * Reset form.
-       */
+      /* =================================================
+         RESET FORM
+      ================================================= */
 
       resetForm();
-
-      /*
-       * Stay on products.
-       */
 
       setActiveSection("products");
 
@@ -349,7 +522,6 @@ export default function AdminPage() {
 
     if (!productId) {
       alert("Product ID is missing.");
-
       return;
     }
 
@@ -375,11 +547,6 @@ export default function AdminPage() {
       setProducts((current) =>
         current.filter((item) => String(item._id) !== productId),
       );
-
-      /*
-       * If currently editing this product,
-       * reset the form.
-       */
 
       if (editingId === productId) {
         resetForm();
@@ -422,9 +589,9 @@ export default function AdminPage() {
         throw new Error(data?.error || "Failed to update order.");
       }
 
-      /*
-       * Update local order list immediately.
-       */
+      /* ===============================================
+         UPDATE LOCAL ORDER LIST
+      =============================================== */
 
       setOrders((current) =>
         current.map((order) =>
@@ -438,9 +605,9 @@ export default function AdminPage() {
         ),
       );
 
-      /*
-       * Also update currently open order.
-       */
+      /* ===============================================
+         UPDATE OPEN ORDER
+      =============================================== */
 
       setSelectedOrder((current) =>
         current && current.orderId === orderId
@@ -498,13 +665,36 @@ export default function AdminPage() {
       return Number(product.stock || 0) > 0 && Number(product.stock || 0) <= 5;
     }).length;
 
+    const bestSellerCount = products.filter((product) =>
+      Boolean(product.bestSeller),
+    ).length;
+
+    const newArrivalCount = products.filter((product) =>
+      Boolean(product.newArrival),
+    ).length;
+
+    const offerCount = products.filter((product) =>
+      Boolean(product.offer),
+    ).length;
+
     return {
       totalProducts,
+
       totalOrders,
+
       pendingOrders,
+
       deliveredOrders,
+
       totalSales,
+
       lowStock,
+
+      bestSellerCount,
+
+      newArrivalCount,
+
+      offerCount,
     };
   }, [products, orders]);
 
@@ -514,82 +704,94 @@ export default function AdminPage() {
 
   if (!authed) {
     return (
-      <main
-        className="container section"
-        style={{
-          minHeight: "70vh",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <form
-          onSubmit={login}
-          className="form"
+      <main className="container section">
+        <div
           style={{
-            width: "100%",
-            maxWidth: 420,
+            minHeight: "70vh",
+
+            display: "flex",
+
+            alignItems: "center",
+
+            justifyContent: "center",
           }}
         >
-          <div
-            style={{
-              textAlign: "center",
-              marginBottom: 25,
-            }}
-          >
-            <div
-              style={{
-                fontSize: 45,
-                marginBottom: 10,
-              }}
-            >
-              🔐
-            </div>
-
-            <span className="eyebrow">LITTLE ONE OUTLET</span>
-
-            <h1>Admin Login</h1>
-
-            <p className="muted">Sign in to manage products and orders.</p>
-          </div>
-
-          <label>
-            Admin Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Enter admin password"
-              autoComplete="current-password"
-              required
-            />
-          </label>
-
-          {authError && (
-            <div
-              style={{
-                marginTop: 12,
-                padding: 12,
-                borderRadius: 10,
-                background: "#fff1f1",
-                color: "#b42318",
-              }}
-            >
-              {authError}
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="btn"
+          <form
+            onSubmit={login}
+            className="form"
             style={{
               width: "100%",
-              marginTop: 15,
+
+              maxWidth: 420,
             }}
           >
-            Login →
-          </button>
-        </form>
+            <div
+              style={{
+                textAlign: "center",
+
+                marginBottom: 25,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 45,
+
+                  marginBottom: 10,
+                }}
+              >
+                🔐
+              </div>
+
+              <span className="eyebrow">LITTLE ONE OUTLET</span>
+
+              <h1>Admin Login</h1>
+
+              <p className="muted">Sign in to manage products and orders.</p>
+            </div>
+
+            <label>
+              Admin Password
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter admin password"
+                autoComplete="current-password"
+                required
+              />
+            </label>
+
+            {authError && (
+              <div
+                style={{
+                  marginTop: 12,
+
+                  padding: 12,
+
+                  borderRadius: 10,
+
+                  background: "#fff1f1",
+
+                  color: "#b42318",
+                }}
+              >
+                {authError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className="btn"
+              style={{
+                width: "100%",
+
+                marginTop: 15,
+              }}
+            >
+              Login →
+            </button>
+          </form>
+        </div>
       </main>
     );
   }
@@ -608,6 +810,7 @@ export default function AdminPage() {
         className="admin-header"
         style={{
           borderBottom: "1px solid var(--line)",
+
           background: "#fff",
         }}
       >
@@ -615,9 +818,13 @@ export default function AdminPage() {
           <div
             style={{
               display: "flex",
+
               justifyContent: "space-between",
+
               alignItems: "center",
+
               gap: 15,
+
               padding: "18px 0",
             }}
           >
@@ -647,6 +854,7 @@ export default function AdminPage() {
       <div
         style={{
           borderBottom: "1px solid var(--line)",
+
           background: "#fff",
         }}
       >
@@ -654,8 +862,11 @@ export default function AdminPage() {
           <nav
             style={{
               display: "flex",
+
               gap: 8,
+
               overflowX: "auto",
+
               padding: "10px 0",
             }}
           >
@@ -689,15 +900,25 @@ export default function AdminPage() {
                 <span
                   style={{
                     marginLeft: 6,
+
                     display: "inline-flex",
+
                     minWidth: 20,
+
                     height: 20,
+
                     alignItems: "center",
+
                     justifyContent: "center",
+
                     borderRadius: "50%",
+
                     background: "#fff",
+
                     color: "var(--brand)",
+
                     fontSize: 11,
+
                     fontWeight: 800,
                   }}
                 >
@@ -737,7 +958,9 @@ export default function AdminPage() {
             <div
               style={{
                 display: "grid",
+
                 gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
+
                 gap: 15,
               }}
             >
@@ -772,6 +995,20 @@ export default function AdminPage() {
               />
 
               <StatCard icon="⚠️" label="Low Stock" value={stats.lowStock} />
+
+              <StatCard
+                icon="🔥"
+                label="Best Sellers"
+                value={stats.bestSellerCount}
+              />
+
+              <StatCard
+                icon="✨"
+                label="New Arrivals"
+                value={stats.newArrivalCount}
+              />
+
+              <StatCard icon="🏷️" label="Offers" value={stats.offerCount} />
             </div>
 
             {/* QUICK ACTIONS */}
@@ -787,8 +1024,11 @@ export default function AdminPage() {
               <div
                 style={{
                   display: "flex",
+
                   gap: 10,
+
                   flexWrap: "wrap",
+
                   marginTop: 12,
                 }}
               >
@@ -844,7 +1084,7 @@ export default function AdminPage() {
                 onSubmit={saveProduct}
                 editing={Boolean(editingId)}
                 saving={savingProduct}
-                categories={CATEGORIES}
+                categories={[...CATEGORIES]}
                 onCancel={resetForm}
               />
             </div>
@@ -855,10 +1095,15 @@ export default function AdminPage() {
               <div
                 style={{
                   display: "flex",
+
                   justifyContent: "space-between",
+
                   alignItems: "center",
+
                   gap: 12,
+
                   marginBottom: 18,
+
                   flexWrap: "wrap",
                 }}
               >
@@ -914,10 +1159,15 @@ export default function AdminPage() {
               <div
                 style={{
                   display: "flex",
+
                   justifyContent: "space-between",
+
                   alignItems: "center",
+
                   gap: 12,
+
                   marginBottom: 18,
+
                   flexWrap: "wrap",
                 }}
               >
@@ -995,8 +1245,11 @@ function StatCard({
       className="form"
       style={{
         minHeight: 120,
+
         display: "flex",
+
         flexDirection: "column",
+
         justifyContent: "space-between",
       }}
     >
@@ -1021,7 +1274,9 @@ function StatCard({
         <strong
           style={{
             display: "block",
+
             marginTop: 4,
+
             fontSize: 25,
           }}
         >

@@ -26,6 +26,10 @@ function makeVariantId(color: string) {
     .replace(/^-+|-+$/g, "")}-${Date.now().toString(36)}`;
 }
 
+/* =========================================================
+   CLEAN VARIANTS
+========================================================= */
+
 function cleanVariants(variants: unknown) {
   if (!Array.isArray(variants)) {
     return [];
@@ -55,15 +59,89 @@ function cleanVariants(variants: unknown) {
         id,
         color,
         images,
+
         ...(video
           ? {
               video,
             }
           : {}),
+
         stock,
       };
     })
     .filter(Boolean);
+}
+
+/* =========================================================
+   CLEAN CATEGORIES
+========================================================= */
+
+function cleanCategories(categories: unknown, oldCategory?: unknown) {
+  let values: unknown[] = [];
+
+  /*
+   * New format:
+   *
+   * categories: [
+   *   "Baby & Toddler Toys",
+   *   "Educational & Learning"
+   * ]
+   */
+
+  if (Array.isArray(categories)) {
+    values = categories;
+  }
+
+  /*
+   * Backward compatibility
+   *
+   * Old format:
+   *
+   * category: "Baby Toys"
+   */
+
+  if (
+    values.length === 0 &&
+    typeof oldCategory === "string" &&
+    oldCategory.trim()
+  ) {
+    values = [oldCategory];
+  }
+
+  return [
+    ...new Set(values.map((item) => String(item || "").trim()).filter(Boolean)),
+  ];
+}
+
+/* =========================================================
+   NORMALIZE PRODUCT
+========================================================= */
+
+function normalizeProduct(product: any) {
+  const categories = cleanCategories(product?.categories, product?.category);
+
+  const variants = Array.isArray(product?.variants) ? product.variants : [];
+
+  const variantStock = variants.reduce(
+    (total: number, variant: any) => total + Number(variant?.stock || 0),
+    0,
+  );
+
+  return {
+    ...product,
+
+    categories,
+
+    stock: variants.length > 0 ? variantStock : Number(product?.stock || 0),
+
+    offer: Boolean(product?.offer),
+
+    newArrival: Boolean(product?.newArrival),
+
+    bestSeller: Boolean(product?.bestSeller),
+
+    featured: Boolean(product?.featured),
+  };
 }
 
 /* =========================================================
@@ -110,7 +188,7 @@ export async function GET(
     }
 
     return NextResponse.json({
-      product,
+      product: normalizeProduct(product),
     });
   } catch (error) {
     console.error("GET /api/products/[id] error:", error);
@@ -176,26 +254,92 @@ export async function PATCH(
     }
 
     /* =====================================================
-       BASIC FIELDS
+       UPDATE OBJECT
     ===================================================== */
 
     const update: Record<string, unknown> = {};
 
+    /* =====================================================
+       NAME
+    ===================================================== */
+
     if (body.name !== undefined) {
-      update.name = String(body.name || "").trim();
+      const name = String(body.name || "").trim();
+
+      if (!name) {
+        return NextResponse.json(
+          {
+            error: "Product name is required.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      update.name = name;
     }
+
+    /* =====================================================
+       SLUG
+    ===================================================== */
 
     if (body.slug !== undefined) {
-      update.slug = String(body.slug || "").trim();
+      const slug = String(body.slug || "").trim();
+
+      if (!slug) {
+        return NextResponse.json(
+          {
+            error: "Product slug is required.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      update.slug = slug;
     }
 
-    if (body.category !== undefined) {
-      update.category = String(body.category || "").trim();
+    /* =====================================================
+       MULTIPLE CATEGORIES
+    ===================================================== */
+
+    if (body.categories !== undefined || body.category !== undefined) {
+      const categories = cleanCategories(body.categories, body.category);
+
+      if (categories.length === 0) {
+        return NextResponse.json(
+          {
+            error: "At least one product category is required.",
+          },
+          {
+            status: 400,
+          },
+        );
+      }
+
+      update.categories = categories;
+
+      /*
+       * Remove old single category
+       * field when possible.
+       */
+
+      update.category = null;
     }
+
+    /* =====================================================
+       DESCRIPTION
+    ===================================================== */
 
     if (body.description !== undefined) {
       update.description = String(body.description || "").trim();
     }
+
+    /* =====================================================
+       FEATURES
+    ===================================================== */
 
     if (body.features !== undefined) {
       update.features = Array.isArray(body.features)
@@ -205,22 +349,36 @@ export async function PATCH(
         : [];
     }
 
+    /* =====================================================
+       REGULAR PRICE
+    ===================================================== */
+
     if (body.regularPrice !== undefined) {
       update.regularPrice = Number(body.regularPrice || 0);
     }
 
+    /* =====================================================
+       OFFER PRICE
+    ===================================================== */
+
     if (body.offerPrice !== undefined) {
       update.offerPrice =
         body.offerPrice === "" || body.offerPrice === null
-          ? undefined
+          ? null
           : Number(body.offerPrice);
     }
 
+    /* =====================================================
+       AGE RANGE
+    ===================================================== */
+
     if (body.ageRange !== undefined) {
-      update.ageRange = body.ageRange
-        ? String(body.ageRange).trim()
-        : undefined;
+      update.ageRange = body.ageRange ? String(body.ageRange).trim() : null;
     }
+
+    /* =====================================================
+       IMAGES
+    ===================================================== */
 
     if (body.images !== undefined) {
       update.images = Array.isArray(body.images)
@@ -228,6 +386,22 @@ export async function PATCH(
             .map((image: unknown) => String(image || "").trim())
             .filter(Boolean)
         : [];
+    }
+
+    /* =====================================================
+       PRODUCT FLAGS
+    ===================================================== */
+
+    if (body.offer !== undefined) {
+      update.offer = Boolean(body.offer);
+    }
+
+    if (body.newArrival !== undefined) {
+      update.newArrival = Boolean(body.newArrival);
+    }
+
+    if (body.bestSeller !== undefined) {
+      update.bestSeller = Boolean(body.bestSeller);
     }
 
     if (body.featured !== undefined) {
@@ -241,11 +415,11 @@ export async function PATCH(
     if (body.variants !== undefined) {
       const variants = cleanVariants(body.variants);
 
-      update.variants = variants.length > 0 ? variants : undefined;
+      update.variants = variants.length > 0 ? variants : null;
 
       /*
-       * Keep main stock synchronized
-       * with total variant stock.
+       * Automatically calculate
+       * total stock.
        */
 
       const totalVariantStock = variants.reduce(
@@ -259,8 +433,9 @@ export async function PATCH(
           : Math.max(0, Number(body.stock || 0));
     } else if (body.stock !== undefined) {
       /*
-       * Only update main stock when
-       * variants are not being changed.
+       * Only change main stock
+       * if there are no existing
+       * variants.
        */
 
       const existingVariants = Array.isArray(existing.variants)
@@ -298,10 +473,14 @@ export async function PATCH(
     }
 
     /* =====================================================
-       UPDATE
+       UPDATED TIME
     ===================================================== */
 
     update.updatedAt = new Date();
+
+    /* =====================================================
+       UPDATE DATABASE
+    ===================================================== */
 
     await d.collection("products").updateOne(
       {
@@ -322,7 +501,8 @@ export async function PATCH(
 
     return NextResponse.json({
       success: true,
-      product,
+
+      product: product ? normalizeProduct(product) : null,
     });
   } catch (error) {
     console.error("PATCH /api/products/[id] error:", error);

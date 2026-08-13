@@ -39,15 +39,58 @@ function cleanVariants(variants: any) {
         id,
         color,
         images,
+
         ...(video
           ? {
               video,
             }
           : {}),
+
         stock,
       };
     })
     .filter(Boolean);
+}
+
+/* =========================================================
+   CLEAN CATEGORIES
+========================================================= */
+
+function cleanCategories(categories: any, oldCategory?: any) {
+  let values: any[] = [];
+
+  /*
+   * New format:
+   *
+   * categories: [
+   *   "Baby & Toddler Toys",
+   *   "Educational & Learning"
+   * ]
+   */
+
+  if (Array.isArray(categories)) {
+    values = categories;
+  }
+
+  /*
+   * Backward compatibility:
+   *
+   * Old product:
+   *
+   * category: "Baby Toys"
+   */
+
+  if (
+    values.length === 0 &&
+    typeof oldCategory === "string" &&
+    oldCategory.trim()
+  ) {
+    values = [oldCategory];
+  }
+
+  return [
+    ...new Set(values.map((item) => String(item || "").trim()).filter(Boolean)),
+  ];
 }
 
 /* =========================================================
@@ -61,6 +104,16 @@ export async function GET(request: Request) {
     const id = searchParams.get("id")?.trim();
 
     const slug = searchParams.get("slug")?.trim();
+
+    const category = searchParams.get("category")?.trim();
+
+    const offer = searchParams.get("offer")?.trim();
+
+    const newArrival = searchParams.get("newArrival")?.trim();
+
+    const bestSeller = searchParams.get("bestSeller")?.trim();
+
+    const featured = searchParams.get("featured")?.trim();
 
     const d = await db();
 
@@ -95,8 +148,27 @@ export async function GET(request: Request) {
         );
       }
 
+      /*
+       * Normalize old product
+       * before returning.
+       */
+
+      const normalizedProduct = {
+        ...product,
+
+        categories: cleanCategories(product.categories, product.category),
+
+        offer: Boolean(product.offer),
+
+        newArrival: Boolean(product.newArrival),
+
+        bestSeller: Boolean(product.bestSeller),
+
+        featured: Boolean(product.featured),
+      };
+
       return NextResponse.json({
-        product,
+        product: normalizedProduct,
       });
     }
 
@@ -120,9 +192,85 @@ export async function GET(request: Request) {
         );
       }
 
+      const normalizedProduct = {
+        ...product,
+
+        categories: cleanCategories(product.categories, product.category),
+
+        offer: Boolean(product.offer),
+
+        newArrival: Boolean(product.newArrival),
+
+        bestSeller: Boolean(product.bestSeller),
+
+        featured: Boolean(product.featured),
+      };
+
       return NextResponse.json({
-        product,
+        product: normalizedProduct,
       });
+    }
+
+    /* =====================================================
+       FILTER
+    ===================================================== */
+
+    const filter: Record<string, any> = {};
+
+    /*
+     * Multiple category support.
+     *
+     * A product is returned if the
+     * selected category exists inside
+     * its categories array.
+     */
+
+    if (category) {
+      filter.$or = [
+        {
+          categories: category,
+        },
+
+        /*
+         * Old products compatibility.
+         */
+
+        {
+          category: category,
+        },
+      ];
+    }
+
+    /* =====================================================
+       OFFER FILTER
+    ===================================================== */
+
+    if (offer === "true") {
+      filter.offer = true;
+    }
+
+    /* =====================================================
+       NEW ARRIVAL FILTER
+    ===================================================== */
+
+    if (newArrival === "true") {
+      filter.newArrival = true;
+    }
+
+    /* =====================================================
+       BEST SELLER FILTER
+    ===================================================== */
+
+    if (bestSeller === "true") {
+      filter.bestSeller = true;
+    }
+
+    /* =====================================================
+       FEATURED FILTER
+    ===================================================== */
+
+    if (featured === "true") {
+      filter.featured = true;
     }
 
     /* =====================================================
@@ -131,14 +279,40 @@ export async function GET(request: Request) {
 
     const products = await d
       .collection("products")
-      .find({})
+      .find(filter)
       .sort({
         createdAt: -1,
       })
       .toArray();
 
+    /*
+     * Normalize old products so
+     * frontend always receives:
+     *
+     * categories: []
+     *
+     * offer
+     * newArrival
+     * bestSeller
+     * featured
+     */
+
+    const normalizedProducts = products.map((product: any) => ({
+      ...product,
+
+      categories: cleanCategories(product.categories, product.category),
+
+      offer: Boolean(product.offer),
+
+      newArrival: Boolean(product.newArrival),
+
+      bestSeller: Boolean(product.bestSeller),
+
+      featured: Boolean(product.featured),
+    }));
+
     return NextResponse.json({
-      products,
+      products: normalizedProducts,
     });
   } catch (error) {
     console.error("GET /api/products error:", error);
@@ -165,6 +339,7 @@ export async function POST(request: Request) {
     const {
       name,
       slug,
+      categories,
       category,
       description,
       features,
@@ -174,6 +349,10 @@ export async function POST(request: Request) {
       ageRange,
       images,
       variants,
+
+      offer,
+      newArrival,
+      bestSeller,
       featured,
     } = body;
 
@@ -203,10 +382,16 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!category || !String(category).trim()) {
+    /* =====================================================
+       CATEGORIES
+    ===================================================== */
+
+    const cleanProductCategories = cleanCategories(categories, category);
+
+    if (cleanProductCategories.length === 0) {
       return NextResponse.json(
         {
-          error: "Product category is required.",
+          error: "At least one product category is required.",
         },
         {
           status: 400,
@@ -261,11 +446,6 @@ export async function POST(request: Request) {
 
     /* =====================================================
        MAIN STOCK
-
-       যদি variants থাকে, main stock-এর value
-       total variant stock হিসেবে রাখা হবে।
-
-       এতে পুরোনো code-ও compatibility পাবে।
     ===================================================== */
 
     const variantStockTotal = cleanProductVariants.reduce(
@@ -287,7 +467,12 @@ export async function POST(request: Request) {
 
       slug: String(slug).trim(),
 
-      category: String(category).trim(),
+      /*
+       * NEW:
+       * Multiple categories.
+       */
+
+      categories: cleanProductCategories,
 
       description: String(description || "").trim(),
 
@@ -309,9 +494,21 @@ export async function POST(request: Request) {
       variants:
         cleanProductVariants.length > 0 ? cleanProductVariants : undefined,
 
+      /* =================================================
+         PRODUCT FLAGS
+      ================================================= */
+
+      offer: Boolean(offer),
+
+      newArrival: Boolean(newArrival),
+
+      bestSeller: Boolean(bestSeller),
+
       featured: Boolean(featured),
 
       createdAt: new Date(),
+
+      updatedAt: new Date(),
     };
 
     /* =====================================================
