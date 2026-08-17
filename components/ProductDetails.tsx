@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
-
+import { useEffect, useRef, useState } from "react";
 import { Product, ProductVariant } from "@/models/types";
 
 import ProductGallery from "@/components/ProductGallery";
@@ -63,32 +62,85 @@ export default function ProductDetails({
      META PIXEL - VIEW CONTENT
   ========================================================= */
 
+  const viewContentFiredRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     if (!product?._id) return;
 
-    const fbq = (window as any).fbq;
+    const productId = String(product._id);
 
-    if (typeof fbq !== "function") {
-      console.warn("Meta Pixel is not ready.");
+    /*
+     * Prevent duplicate ViewContent for the same product
+     * during React Strict Mode / re-render.
+     */
+
+    if (viewContentFiredRef.current === productId) {
       return;
     }
 
-    fbq("track", "ViewContent", {
-      content_ids: [String(product._id)],
-      content_name: product.name,
-      content_type: "product",
-      value: Number(finalPrice) || 0,
-      currency: "BDT",
-    });
+    let attempts = 0;
+    const maxAttempts = 40;
 
-    console.log("Meta Pixel ViewContent fired:", {
-      productId: String(product._id),
-      productName: product.name,
-      value: Number(finalPrice) || 0,
-    });
-  }, [product?._id]);
+    const fireViewContent = () => {
+      const fbq = (window as any).fbq;
+
+      /*
+       * Pixel may still be loading because the layout uses
+       * next/script with afterInteractive.
+       *
+       * So we wait and retry instead of giving up immediately.
+       */
+
+      if (typeof fbq !== "function") {
+        attempts += 1;
+
+        if (attempts < maxAttempts) {
+          window.setTimeout(fireViewContent, 250);
+        } else {
+          console.warn("Meta Pixel was not ready. ViewContent was not fired.");
+        }
+
+        return;
+      }
+
+      /*
+       * Mark as fired before sending the event.
+       * This prevents duplicate events from React re-renders.
+       */
+
+      viewContentFiredRef.current = productId;
+
+      fbq("track", "ViewContent", {
+        content_ids: [productId],
+
+        content_name: product.name || "Product",
+
+        content_type: "product",
+
+        value: Number(finalPrice) || 0,
+
+        currency: "BDT",
+      });
+
+      console.log("Meta Pixel ViewContent fired:", {
+        productId,
+        productName: product.name,
+        value: Number(finalPrice) || 0,
+        currency: "BDT",
+      });
+    };
+
+    fireViewContent();
+
+    return () => {
+      /*
+       * No persistent interval is used.
+       * Each retry uses setTimeout.
+       */
+    };
+  }, [product?._id, product?.name, finalPrice]);
 
   /* =========================================================
      STOCK
