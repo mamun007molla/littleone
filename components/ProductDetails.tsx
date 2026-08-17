@@ -52,7 +52,7 @@ export default function ProductDetails({
   const hasOffer =
     offerPrice !== null && offerPrice > 0 && offerPrice < regularPrice;
 
-  const finalPrice = hasOffer ? offerPrice : regularPrice;
+  const finalPrice = hasOffer ? Number(offerPrice) : regularPrice;
 
   const discount =
     hasOffer && regularPrice > 0
@@ -68,100 +68,27 @@ export default function ProductDetails({
 
     if (!product?._id) return;
 
-    let interval: ReturnType<typeof setInterval> | null = null;
+    const fbq = (window as any).fbq;
 
-    let timeout: ReturnType<typeof setTimeout> | null = null;
-
-    let eventSent = false;
-
-    const sendViewContent = () => {
-      /*
-       * Don't send the event more than once
-       * for this product component instance.
-       */
-
-      if (eventSent) {
-        return true;
-      }
-
-      const fbq = (window as any).fbq;
-
-      /*
-       * Meta Pixel is not ready yet.
-       */
-
-      if (typeof fbq !== "function") {
-        return false;
-      }
-
-      /*
-       * Send ViewContent event
-       */
-
-      fbq("track", "ViewContent", {
-        content_ids: [String(product._id)],
-        content_name: product.name,
-        content_type: "product",
-        value: Number(finalPrice) || 0,
-        currency: "BDT",
-      });
-
-      eventSent = true;
-
-      /*
-       * Stop retrying once event is sent.
-       */
-
-      if (interval) {
-        clearInterval(interval);
-        interval = null;
-      }
-
-      return true;
-    };
-
-    /*
-     * Try immediately.
-     */
-
-    const sentImmediately = sendViewContent();
-
-    /*
-     * If Meta Pixel isn't ready,
-     * retry every 300ms.
-     */
-
-    if (!sentImmediately) {
-      interval = setInterval(() => {
-        sendViewContent();
-      }, 300);
-
-      /*
-       * Maximum retry time: 10 seconds.
-       */
-
-      timeout = setTimeout(() => {
-        if (interval) {
-          clearInterval(interval);
-          interval = null;
-        }
-      }, 10000);
+    if (typeof fbq !== "function") {
+      console.warn("Meta Pixel is not ready.");
+      return;
     }
 
-    /*
-     * Cleanup when leaving the product page.
-     */
+    fbq("track", "ViewContent", {
+      content_ids: [String(product._id)],
+      content_name: product.name,
+      content_type: "product",
+      value: Number(finalPrice) || 0,
+      currency: "BDT",
+    });
 
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-
-      if (timeout) {
-        clearTimeout(timeout);
-      }
-    };
-  }, [product?._id, product?.name, finalPrice]);
+    console.log("Meta Pixel ViewContent fired:", {
+      productId: String(product._id),
+      productName: product.name,
+      value: Number(finalPrice) || 0,
+    });
+  }, [product?._id]);
 
   /* =========================================================
      STOCK
