@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Product, ProductVariant } from "@/models/types";
 
@@ -64,6 +64,28 @@ export default function ProductDetails({
   const discount = hasOffer
     ? Math.round(((regularPrice - Number(offerPrice)) / regularPrice) * 100)
     : 0;
+
+  /* =========================================================
+     META PIXEL - VIEW CONTENT
+  ========================================================= */
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const fbq = (window as any).fbq;
+
+    if (typeof fbq !== "function") return;
+
+    if (!product._id) return;
+
+    fbq("track", "ViewContent", {
+      content_ids: [String(product._id)],
+      content_name: product.name,
+      content_type: "product",
+      value: finalPrice,
+      currency: "BDT",
+    });
+  }, [product._id, product.name, finalPrice]);
 
   /* =========================================================
      STOCK

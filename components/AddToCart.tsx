@@ -33,6 +33,22 @@ export default function AddToCart({
     : Number(product.stock || 0);
 
   /* =========================================================
+     PRICE
+  ========================================================= */
+
+  const regularPrice = Number(product.regularPrice || 0);
+
+  const offerPrice =
+    product.offerPrice !== undefined && product.offerPrice !== null
+      ? Number(product.offerPrice)
+      : null;
+
+  const hasOffer =
+    offerPrice !== null && offerPrice > 0 && offerPrice < regularPrice;
+
+  const finalPrice = hasOffer ? offerPrice : regularPrice;
+
+  /* =========================================================
      QUANTITY
   ========================================================= */
 
@@ -131,6 +147,22 @@ export default function AddToCart({
        */
 
       window.dispatchEvent(new Event("loo-cart"));
+
+      /* =====================================================
+         META PIXEL - ADD TO CART
+      ===================================================== */
+
+      const fbq = (window as any).fbq;
+
+      if (typeof fbq === "function") {
+        fbq("track", "AddToCart", {
+          content_ids: [productId],
+          content_name: product.name,
+          content_type: "product",
+          value: finalPrice * qty,
+          currency: "BDT",
+        });
+      }
 
       /* =====================================================
          SUCCESS
