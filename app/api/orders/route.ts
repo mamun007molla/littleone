@@ -1,6 +1,13 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { db } from "@/lib/mongodb";
+import { Resend } from "resend";
+
+/* =========================================================
+   RESEND
+========================================================= */
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 /* =========================================================
    HELPERS
@@ -17,15 +24,11 @@ function normalizePhone(value: unknown): string {
 }
 
 /*
- * Current cart stores:
- *
+ * Current cart:
  * _id = actual MongoDB product ID
  *
- * Older cart versions may have:
- *
+ * Older cart:
  * productId-variantId
- *
- * This helper supports both.
  */
 function getProductId(item: any): string {
   const directId = normalizeId(item?.productId);
@@ -40,18 +43,10 @@ function getProductId(item: any): string {
     return "";
   }
 
-  /*
-   * Current version:
-   * _id is already the product ObjectId.
-   */
   if (ObjectId.isValid(rawId)) {
     return rawId;
   }
 
-  /*
-   * Legacy composite ID:
-   * productId-variantId
-   */
   const firstPart = rawId.split("-")[0];
 
   if (ObjectId.isValid(firstPart)) {
@@ -80,16 +75,6 @@ function getProductPrice(product: any) {
 
 /* =========================================================
    GET ORDERS
-
-   Customer:
-
-   /api/orders?orderId=LO-XXX
-   /api/orders?phone=017XXXXXXXX
-   /api/orders?orderId=LO-XXX&phone=017XXXXXXXX
-
-   Admin:
-
-   /api/orders
 ========================================================= */
 
 export async function GET(request: Request) {
@@ -111,9 +96,7 @@ export async function GET(request: Request) {
     if (orderId || phone) {
       let order = null;
 
-      /*
-       * Order ID + phone
-       */
+      /* Order ID + Phone */
 
       if (orderId && phone) {
         order = await d.collection("orders").findOne({
@@ -121,13 +104,14 @@ export async function GET(request: Request) {
           phone,
         });
       } else if (orderId) {
-        /*
-         * Order ID only
-         */
+
+      /* Order ID */
         order = await d.collection("orders").findOne({
           orderId,
         });
       } else if (phone) {
+
+      /* Phone */
         const phoneCandidates = [phone, phone.replace(/^(\+?88)/, "")].filter(
           Boolean,
         );
@@ -380,7 +364,7 @@ export async function POST(request: Request) {
           {
             error: `${
               item?.name || "This product"
-            } is no longer available. Please remove it from your cart and add it again.`,
+            } is no longer available. Please remove the item from your cart and add it again.`,
           },
           {
             status: 400,
@@ -427,9 +411,9 @@ export async function POST(request: Request) {
         return NextResponse.json(
           {
             error: selectedVariant
-              ? `${product.name} (${
-                  selectedVariant.color
-                }) has only ${stock} item${stock === 1 ? "" : "s"} available.`
+              ? `${product.name} (${selectedVariant.color}) has only ${stock} item${
+                  stock === 1 ? "" : "s"
+                } available.`
               : `${product.name} has only ${stock} item${
                   stock === 1 ? "" : "s"
                 } available.`,
@@ -500,9 +484,6 @@ export async function POST(request: Request) {
 
     /* =====================================================
        SECOND STOCK CHECK
-       
-       Check everything again immediately before
-       decreasing stock.
     ===================================================== */
 
     for (const item of verifiedItems) {
@@ -694,6 +675,307 @@ export async function POST(request: Request) {
     ===================================================== */
 
     await d.collection("orders").insertOne(order);
+
+    /* =====================================================
+       SEND ADMIN EMAIL
+    ===================================================== */
+
+    try {
+      const adminEmail = process.env.ADMIN_EMAIL;
+
+      const fromEmail =
+        process.env.RESEND_FROM || "Little One Outlet <onboarding@resend.dev>";
+
+      if (process.env.RESEND_API_KEY && adminEmail) {
+        const itemRows = verifiedItems
+          .map(
+            (item) => `
+              <tr>
+                <td style="padding:10px;border-bottom:1px solid #eee;">
+                  ${item.name}${
+                    item.variantColor ? ` (${item.variantColor})` : ""
+                  }
+                </td>
+
+                <td style="padding:10px;text-align:center;border-bottom:1px solid #eee;">
+                  ${item.quantity}
+                </td>
+
+                <td style="padding:10px;text-align:right;border-bottom:1px solid #eee;">
+                  ৳${item.price}
+                </td>
+
+                <td style="padding:10px;text-align:right;border-bottom:1px solid #eee;">
+                  ৳${item.price * item.quantity}
+                </td>
+              </tr>
+            `,
+          )
+          .join("");
+
+        const deliveryLabel =
+          order.deliveryType === "outside" ? "Outside Dhaka" : "Inside Dhaka";
+
+        const paymentLabel =
+          order.payment === "bkash"
+            ? "bKash"
+            : order.payment === "nagad"
+              ? "Nagad"
+              : order.payment === "bank"
+                ? "Bank Transfer"
+                : "Cash on Delivery";
+
+        const { error: emailError } = await resend.emails.send({
+          from: fromEmail,
+
+          to: [adminEmail],
+
+          subject: `🛍️ New Order — ${orderId} | ৳${total}`,
+
+          html: `
+              <div
+                style="
+                  font-family:Arial,sans-serif;
+                  max-width:700px;
+                  margin:0 auto;
+                  color:#202536;
+                "
+              >
+
+                <div
+                  style="
+                    background:#3742fa;
+                    color:#fff;
+                    padding:24px;
+                    border-radius:14px 14px 0 0;
+                  "
+                >
+                  <h1 style="margin:0 0 8px;">
+                    🛍️ New Order Received
+                  </h1>
+
+                  <p style="margin:0;">
+                    Little One Outlet
+                  </p>
+                </div>
+
+                <div
+                  style="
+                    padding:24px;
+                    border:1px solid #eee;
+                    border-top:0;
+                    border-radius:0 0 14px 14px;
+                  "
+                >
+
+                  <h2 style="margin-top:0;">
+                    Order #${orderId}
+                  </h2>
+
+                  <div
+                    style="
+                      background:#f6f7ff;
+                      padding:16px;
+                      border-radius:10px;
+                      margin-bottom:20px;
+                    "
+                  >
+
+                    <p>
+                      <strong>Customer:</strong>
+                      ${order.name}
+                    </p>
+
+                    <p>
+                      <strong>Phone:</strong>
+                      ${order.phone}
+                    </p>
+
+                    <p>
+                      <strong>Address:</strong>
+                      ${order.address}
+                    </p>
+
+                    <p>
+                      <strong>Area:</strong>
+                      ${order.area || "-"}
+                    </p>
+
+                    <p>
+                      <strong>District:</strong>
+                      ${order.district}
+                    </p>
+
+                    <p>
+                      <strong>Delivery:</strong>
+                      ${deliveryLabel}
+                      — ৳${order.delivery}
+                    </p>
+
+                    <p>
+                      <strong>Payment:</strong>
+                      ${paymentLabel}
+                    </p>
+
+                  </div>
+
+                  ${
+                    order.note
+                      ? `
+                        <div
+                          style="
+                            background:#fff8e6;
+                            padding:14px;
+                            border-radius:10px;
+                            margin-bottom:20px;
+                          "
+                        >
+                          <strong>
+                            Customer Note:
+                          </strong>
+
+                          <br />
+
+                          ${order.note}
+                        </div>
+                      `
+                      : ""
+                  }
+
+                  <h3>
+                    Order Items
+                  </h3>
+
+                  <table
+                    width="100%"
+                    cellpadding="0"
+                    cellspacing="0"
+                    style="border-collapse:collapse;"
+                  >
+
+                    <thead>
+                      <tr
+                        style="
+                          background:#f5f6ff;
+                        "
+                      >
+
+                        <th
+                          style="
+                            padding:10px;
+                            text-align:left;
+                          "
+                        >
+                          Product
+                        </th>
+
+                        <th
+                          style="
+                            padding:10px;
+                            text-align:center;
+                          "
+                        >
+                          Qty
+                        </th>
+
+                        <th
+                          style="
+                            padding:10px;
+                            text-align:right;
+                          "
+                        >
+                          Price
+                        </th>
+
+                        <th
+                          style="
+                            padding:10px;
+                            text-align:right;
+                          "
+                        >
+                          Total
+                        </th>
+
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      ${itemRows}
+                    </tbody>
+
+                  </table>
+
+                  <div
+                    style="
+                      margin-top:20px;
+                      border-top:2px solid #eee;
+                      padding-top:16px;
+                    "
+                  >
+
+                    <p style="text-align:right;">
+                      <strong>
+                        Subtotal:
+                      </strong>
+                      ৳${subtotal}
+                    </p>
+
+                    <p style="text-align:right;">
+                      <strong>
+                        Delivery:
+                      </strong>
+                      ৳${finalDelivery}
+                    </p>
+
+                    <h2
+                      style="
+                        text-align:right;
+                        color:#3742fa;
+                      "
+                    >
+                      Total: ৳${total}
+                    </h2>
+
+                  </div>
+
+                  <div
+                    style="
+                      margin-top:24px;
+                      padding:14px;
+                      background:#eef0ff;
+                      border-radius:10px;
+                    "
+                  >
+                    <strong>
+                      Status:
+                    </strong>
+
+                    Pending
+                  </div>
+
+                </div>
+              </div>
+            `,
+        });
+
+        if (emailError) {
+          console.error("Order notification email failed:", emailError);
+        } else {
+          console.log(`Order notification email sent for ${orderId}`);
+        }
+      } else {
+        console.warn(
+          "Order email skipped: RESEND_API_KEY or ADMIN_EMAIL is missing.",
+        );
+      }
+    } catch (emailError) {
+      /*
+       * Email failure must NOT cancel
+       * an already-created order.
+       */
+
+      console.error("Order notification email error:", emailError);
+    }
 
     /* =====================================================
        SUCCESS

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+
 import { Product, ProductVariant } from "@/models/types";
 
 import ProductGallery from "@/components/ProductGallery";
@@ -23,6 +24,26 @@ export default function ProductDetails({
   const [selectedVariant, setSelectedVariant] = useState<ProductVariant | null>(
     variants.length > 0 ? variants[0] : null,
   );
+
+  /* =========================================================
+     DESCRIPTION EXPAND / COLLAPSE
+  ========================================================= */
+
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+
+  const description = product.description || "";
+
+  /*
+   * Show See More only when description
+   * is long enough.
+   *
+   * 3 lines will be visible initially.
+   */
+
+  const descriptionLines = description.split("\n");
+
+  const shouldCollapseDescription =
+    descriptionLines.length > 3 || description.length > 180;
 
   /* =========================================================
      PRICE
@@ -255,10 +276,59 @@ export default function ProductDetails({
               style={{
                 lineHeight: 1.75,
                 whiteSpace: "pre-line",
+                margin: 0,
+
+                /*
+                 * Initially show approximately
+                 * 3 lines for long descriptions.
+                 */
+
+                display:
+                  !descriptionExpanded && shouldCollapseDescription
+                    ? "-webkit-box"
+                    : "block",
+
+                WebkitLineClamp:
+                  !descriptionExpanded && shouldCollapseDescription
+                    ? 3
+                    : "unset",
+
+                WebkitBoxOrient:
+                  !descriptionExpanded && shouldCollapseDescription
+                    ? "vertical"
+                    : "unset",
+
+                overflow:
+                  !descriptionExpanded && shouldCollapseDescription
+                    ? "hidden"
+                    : "visible",
               }}
             >
-              {product.description}
+              {description}
             </p>
+
+            {/* =================================================
+                SEE MORE / SEE LESS
+            ================================================= */}
+
+            {shouldCollapseDescription && (
+              <button
+                type="button"
+                onClick={() => setDescriptionExpanded((current) => !current)}
+                style={{
+                  marginTop: 8,
+                  padding: 0,
+                  border: "none",
+                  background: "transparent",
+                  color: "#3742fa",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
+                {descriptionExpanded ? "See Less" : "See More"}
+              </button>
+            )}
           </div>
         )}
 
@@ -382,6 +452,8 @@ export default function ProductDetails({
               marginTop: 20,
             }}
           >
+            {/* NEW ARRIVAL */}
+
             {product.newArrival && (
               <span
                 style={{
@@ -397,6 +469,8 @@ export default function ProductDetails({
               </span>
             )}
 
+            {/* BEST SELLER */}
+
             {product.bestSeller && (
               <span
                 style={{
@@ -411,6 +485,8 @@ export default function ProductDetails({
                 🔥 Best Seller
               </span>
             )}
+
+            {/* OFFER */}
 
             {product.offer && (
               <span
