@@ -66,66 +66,102 @@ export default function ProductDetails({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    if (!product._id) return;
+    if (!product?._id) return;
 
-    let attempts = 0;
+    let interval: ReturnType<typeof setInterval> | null = null;
 
-    let timer: ReturnType<typeof setInterval> | null = null;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    let eventSent = false;
 
     const sendViewContent = () => {
-      const fbq = (window as any).fbq;
-
-      if (typeof fbq === "function") {
-        fbq("track", "ViewContent", {
-          content_ids: [String(product._id)],
-          content_name: product.name,
-          content_type: "product",
-          value: finalPrice,
-          currency: "BDT",
-        });
-
-        if (timer) {
-          clearInterval(timer);
-          timer = null;
-        }
-
-        return;
-      }
-
-      attempts++;
-
       /*
-       * Try for approximately 10 seconds
-       * if Meta Pixel is still loading.
+       * Don't send the event more than once
+       * for this product component instance.
        */
 
-      if (attempts >= 20 && timer) {
-        clearInterval(timer);
-        timer = null;
+      if (eventSent) {
+        return true;
       }
+
+      const fbq = (window as any).fbq;
+
+      /*
+       * Meta Pixel is not ready yet.
+       */
+
+      if (typeof fbq !== "function") {
+        return false;
+      }
+
+      /*
+       * Send ViewContent event
+       */
+
+      fbq("track", "ViewContent", {
+        content_ids: [String(product._id)],
+        content_name: product.name,
+        content_type: "product",
+        value: Number(finalPrice) || 0,
+        currency: "BDT",
+      });
+
+      eventSent = true;
+
+      /*
+       * Stop retrying once event is sent.
+       */
+
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+
+      return true;
     };
 
     /*
-     * Try immediately
+     * Try immediately.
      */
 
-    sendViewContent();
+    const sentImmediately = sendViewContent();
 
     /*
-     * Retry every 500ms if Meta Pixel
-     * has not loaded yet.
+     * If Meta Pixel isn't ready,
+     * retry every 300ms.
      */
 
-    if (typeof (window as any).fbq !== "function") {
-      timer = setInterval(sendViewContent, 500);
+    if (!sentImmediately) {
+      interval = setInterval(() => {
+        sendViewContent();
+      }, 300);
+
+      /*
+       * Maximum retry time: 10 seconds.
+       */
+
+      timeout = setTimeout(() => {
+        if (interval) {
+          clearInterval(interval);
+          interval = null;
+        }
+      }, 10000);
     }
 
+    /*
+     * Cleanup when leaving the product page.
+     */
+
     return () => {
-      if (timer) {
-        clearInterval(timer);
+      if (interval) {
+        clearInterval(interval);
+      }
+
+      if (timeout) {
+        clearTimeout(timeout);
       }
     };
-  }, [product._id, product.name, finalPrice]);
+  }, [product?._id, product?.name, finalPrice]);
 
   /* =========================================================
      STOCK
