@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Product, ProductVariant } from "@/models/types";
 
@@ -43,6 +43,106 @@ export default function ProductDetailsClient({
     hasOffer && regularPrice > 0
       ? Math.round(((regularPrice - offerPrice!) / regularPrice) * 100)
       : 0;
+
+  /* =========================================================
+     META PIXEL - VIEW CONTENT
+  ========================================================= */
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const rawId =
+      (product as any)?._id ?? (product as any)?.id ?? product?.slug ?? "";
+
+    const contentId = rawId ? String(rawId) : "";
+
+    if (!contentId) {
+      console.warn(
+        "Meta Pixel ViewContent: Product ID and slug are missing.",
+        product,
+      );
+      return;
+    }
+
+    let interval: ReturnType<typeof setInterval> | null = null;
+    let timeout: ReturnType<typeof setTimeout> | null = null;
+
+    let fired = false;
+
+    const fireViewContent = () => {
+      const fbq = (window as any).fbq;
+
+      if (typeof fbq !== "function") {
+        return false;
+      }
+
+      if (fired) {
+        return true;
+      }
+
+      fired = true;
+
+      const eventData = {
+        content_ids: [contentId],
+        content_name: product.name || "Product",
+        content_type: "product",
+        value: Number(finalPrice) || 0,
+        currency: "BDT",
+      };
+
+      fbq("track", "ViewContent", eventData);
+
+      console.log("Meta Pixel ViewContent fired:", eventData);
+
+      return true;
+    };
+
+    const firstAttemptSuccessful = fireViewContent();
+
+    if (!firstAttemptSuccessful) {
+      interval = setInterval(() => {
+        const success = fireViewContent();
+
+        if (success) {
+          if (interval) {
+            clearInterval(interval);
+            interval = null;
+          }
+        }
+      }, 500);
+    }
+
+    timeout = setTimeout(() => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+
+      if (!fired) {
+        console.warn(
+          "Meta Pixel ViewContent could not be fired within 20 seconds.",
+        );
+      }
+    }, 20000);
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
+  }, [
+    (product as any)?._id,
+    (product as any)?.id,
+    product?.slug,
+    product?.name,
+    finalPrice,
+  ]);
 
   /* =========================================================
      STOCK
