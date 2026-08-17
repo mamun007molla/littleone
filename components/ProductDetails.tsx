@@ -33,13 +33,6 @@ export default function ProductDetails({
 
   const description = product.description || "";
 
-  /*
-   * Show See More only when description
-   * is long enough.
-   *
-   * 3 lines will be visible initially.
-   */
-
   const descriptionLines = description.split("\n");
 
   const shouldCollapseDescription =
@@ -61,9 +54,10 @@ export default function ProductDetails({
 
   const finalPrice = hasOffer ? offerPrice : regularPrice;
 
-  const discount = hasOffer
-    ? Math.round(((regularPrice - Number(offerPrice)) / regularPrice) * 100)
-    : 0;
+  const discount =
+    hasOffer && regularPrice > 0
+      ? Math.round(((regularPrice - Number(offerPrice)) / regularPrice) * 100)
+      : 0;
 
   /* =========================================================
      META PIXEL - VIEW CONTENT
@@ -72,19 +66,65 @@ export default function ProductDetails({
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    const fbq = (window as any).fbq;
-
-    if (typeof fbq !== "function") return;
-
     if (!product._id) return;
 
-    fbq("track", "ViewContent", {
-      content_ids: [String(product._id)],
-      content_name: product.name,
-      content_type: "product",
-      value: finalPrice,
-      currency: "BDT",
-    });
+    let attempts = 0;
+
+    let timer: ReturnType<typeof setInterval> | null = null;
+
+    const sendViewContent = () => {
+      const fbq = (window as any).fbq;
+
+      if (typeof fbq === "function") {
+        fbq("track", "ViewContent", {
+          content_ids: [String(product._id)],
+          content_name: product.name,
+          content_type: "product",
+          value: finalPrice,
+          currency: "BDT",
+        });
+
+        if (timer) {
+          clearInterval(timer);
+          timer = null;
+        }
+
+        return;
+      }
+
+      attempts++;
+
+      /*
+       * Try for approximately 10 seconds
+       * if Meta Pixel is still loading.
+       */
+
+      if (attempts >= 20 && timer) {
+        clearInterval(timer);
+        timer = null;
+      }
+    };
+
+    /*
+     * Try immediately
+     */
+
+    sendViewContent();
+
+    /*
+     * Retry every 500ms if Meta Pixel
+     * has not loaded yet.
+     */
+
+    if (typeof (window as any).fbq !== "function") {
+      timer = setInterval(sendViewContent, 500);
+    }
+
+    return () => {
+      if (timer) {
+        clearInterval(timer);
+      }
+    };
   }, [product._id, product.name, finalPrice]);
 
   /* =========================================================
@@ -299,11 +339,6 @@ export default function ProductDetails({
                 lineHeight: 1.75,
                 whiteSpace: "pre-line",
                 margin: 0,
-
-                /*
-                 * Initially show approximately
-                 * 3 lines for long descriptions.
-                 */
 
                 display:
                   !descriptionExpanded && shouldCollapseDescription
