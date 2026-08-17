@@ -67,25 +67,37 @@ export default function ProductDetails({
       return;
     }
 
-    if (!product?._id) {
-      console.warn("Meta Pixel ViewContent: Product ID is missing.");
+    /*
+     * Product ID is preferred.
+     * If _id is unavailable, use slug as fallback.
+     */
+
+    const contentId = product?._id
+      ? String(product._id)
+      : product?.slug
+        ? String(product.slug)
+        : "";
+
+    if (!contentId) {
+      console.warn("Meta Pixel ViewContent: Product ID and slug are missing.");
       return;
     }
 
-    const productId = String(product._id);
-
     let interval: ReturnType<typeof setInterval> | null = null;
-
     let timeout: ReturnType<typeof setTimeout> | null = null;
 
     let fired = false;
+
+    /* =======================================================
+       FIRE VIEW CONTENT
+    ======================================================= */
 
     const fireViewContent = () => {
       const fbq = (window as any).fbq;
 
       /*
-       * Pixel may not be ready immediately because
-       * Meta Pixel is loaded using next/script.
+       * Meta Pixel may not be ready immediately
+       * because it is loaded through next/script.
        */
 
       if (typeof fbq !== "function") {
@@ -93,7 +105,7 @@ export default function ProductDetails({
       }
 
       /*
-       * Prevent duplicate firing.
+       * Prevent duplicate event from this effect instance.
        */
 
       if (fired) {
@@ -102,8 +114,8 @@ export default function ProductDetails({
 
       fired = true;
 
-      fbq("track", "ViewContent", {
-        content_ids: [productId],
+      const eventData = {
+        content_ids: [contentId],
 
         content_name: product.name || "Product",
 
@@ -112,14 +124,16 @@ export default function ProductDetails({
         value: Number(finalPrice) || 0,
 
         currency: "BDT",
-      });
+      };
 
-      console.log("Meta Pixel ViewContent fired:", {
-        productId,
-        productName: product.name,
-        value: Number(finalPrice) || 0,
-        currency: "BDT",
-      });
+      /*
+       * IMPORTANT:
+       * ViewContent is a standard Meta Pixel event.
+       */
+
+      fbq("track", "ViewContent", eventData);
+
+      console.log("Meta Pixel ViewContent fired:", eventData);
 
       return true;
     };
@@ -177,7 +191,7 @@ export default function ProductDetails({
         clearTimeout(timeout);
       }
     };
-  }, [product?._id, product?.name, finalPrice]);
+  }, [product?._id, product?.slug, product?.name, finalPrice]);
 
   /* =========================================================
      STOCK
