@@ -60,6 +60,8 @@ export default function ProductDetails({
 
   /* =========================================================
      META PIXEL - VIEW CONTENT
+     (FIXED: added id/productId fallback + debug logging so the
+     event no longer silently fails when _id/slug shape differs)
   ========================================================= */
 
   useEffect(() => {
@@ -69,17 +71,22 @@ export default function ProductDetails({
 
     /*
      * Product ID is preferred.
-     * If _id is unavailable, use slug as fallback.
+     * Fallback chain: _id -> id -> slug
+     * (some data sources use "id" instead of "_id",
+     * this was the original bug causing ViewContent
+     * to never fire for those products)
      */
 
-    const contentId = product?._id
-      ? String(product._id)
-      : product?.slug
-        ? String(product.slug)
-        : "";
+    const rawId =
+      (product as any)?._id ?? (product as any)?.id ?? product?.slug ?? "";
+
+    const contentId = rawId ? String(rawId) : "";
 
     if (!contentId) {
-      console.warn("Meta Pixel ViewContent: Product ID and slug are missing.");
+      console.warn(
+        "Meta Pixel ViewContent: Product ID and slug are missing.",
+        product,
+      );
       return;
     }
 
@@ -191,7 +198,13 @@ export default function ProductDetails({
         clearTimeout(timeout);
       }
     };
-  }, [product?._id, product?.slug, product?.name, finalPrice]);
+  }, [
+    (product as any)?._id,
+    (product as any)?.id,
+    product?.slug,
+    product?.name,
+    finalPrice,
+  ]);
 
   /* =========================================================
      STOCK
