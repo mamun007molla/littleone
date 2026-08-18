@@ -1,51 +1,20 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+
 import Link from "next/link";
+
 import { CartItem } from "@/models/types";
 
-// Meta Pixel TypeScript declaration
-type MetaPixelFunction = (
-  command: string,
-  eventName: string,
-  parameters?: Record<string, unknown>,
-) => void;
+import CheckoutCustomerForm from "@/components/checkout/CheckoutCustomerForm";
+import CheckoutOrderSummary from "@/components/checkout/CheckoutOrderSummary";
+import CheckoutSuccess from "@/components/checkout/CheckoutSuccess";
 
-declare global {
-  interface Window {
-    fbq?: MetaPixelFunction;
-  }
-}
+import { trackMetaEvent } from "@/lib/metaPixel";
 
 type DeliveryType = "inside" | "outside";
 
 type PaymentMethod = "cod" | "bkash" | "nagad" | "bank";
-
-const PAYMENT_DETAILS = {
-  bkash: {
-    title: "bKash",
-    number: "01778930553",
-  },
-
-  nagad: {
-    title: "Nagad",
-    number: "01778930553",
-  },
-
-  bank: {
-    title: "Bank Transfer",
-    bankName: "BRAC Bank PLC",
-    accountName: "MD MAMUN MOLLA",
-    accountNumber: "1053335630001",
-    branchName: "KONABARI SME/KRISHI BR",
-    routingNumber: "060330952",
-    swiftCode: "BRAKBDDH",
-  },
-
-  cod: {
-    title: "Cash on Delivery",
-  },
-};
 
 export default function CheckoutPage() {
   /* =====================================================
@@ -65,7 +34,7 @@ export default function CheckoutPage() {
   const initiateCheckoutFired = useRef(false);
 
   /* =====================================================
-     CUSTOMER INFORMATION
+     CUSTOMER
   ===================================================== */
 
   const [name, setName] = useState("");
@@ -152,7 +121,7 @@ export default function CheckoutPage() {
   const total = subtotal + delivery;
 
   /* =====================================================
-     META PIXEL - INITIATE CHECKOUT
+     INITIATE CHECKOUT
   ===================================================== */
 
   useEffect(() => {
@@ -164,12 +133,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (typeof window === "undefined" || typeof window.fbq !== "function") {
-      return;
-    }
-
-    initiateCheckoutFired.current = true;
-
     const contentIds = items.map((item) => String(item._id));
 
     const numItems = items.reduce(
@@ -177,22 +140,21 @@ export default function CheckoutPage() {
       0,
     );
 
-    const checkoutValue = Number(total);
-
-    window.fbq("track", "InitiateCheckout", {
+    const fired = trackMetaEvent("InitiateCheckout", {
       content_ids: contentIds,
+
       content_type: "product",
-      value: checkoutValue,
+
+      value: Number(total),
+
       currency: "BDT",
+
       num_items: numItems,
     });
 
-    console.log("Meta Pixel InitiateCheckout fired", {
-      content_ids: contentIds,
-      value: checkoutValue,
-      currency: "BDT",
-      num_items: numItems,
-    });
+    if (fired) {
+      initiateCheckoutFired.current = true;
+    }
   }, [loading, items, total]);
 
   /* =====================================================
@@ -225,9 +187,7 @@ export default function CheckoutPage() {
 
     setError("");
 
-    /* =================================================
-       BASIC VALIDATION
-    ================================================= */
+    /* BASIC VALIDATION */
 
     if (!items.length) {
       setError("Your cart is empty.");
@@ -253,9 +213,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    /* =================================================
-       PAYMENT VALIDATION
-    ================================================= */
+    /* PAYMENT VALIDATION */
 
     if (payment === "bkash" || payment === "nagad") {
       if (!senderNumber.trim()) {
@@ -279,16 +237,10 @@ export default function CheckoutPage() {
       }
     }
 
-    /* =================================================
-       SUBMITTING
-    ================================================= */
-
     setSubmitting(true);
 
     try {
-      /* =================================================
-         ORDER ITEMS
-      ================================================= */
+      /* ORDER ITEMS */
 
       const orderItems = items.map((item) => ({
         _id: String(item._id),
@@ -304,9 +256,7 @@ export default function CheckoutPage() {
         variantImage: item.variantImage,
       }));
 
-      /* =================================================
-         CREATE ORDER
-      ================================================= */
+      /* CREATE ORDER */
 
       const response = await fetch("/api/orders", {
         method: "POST",
@@ -348,17 +298,11 @@ export default function CheckoutPage() {
         data = {};
       }
 
-      /* =================================================
-         API ERROR
-      ================================================= */
-
       if (!response.ok) {
         throw new Error(data?.error || "Order could not be placed.");
       }
 
-      /* =================================================
-         ORDER ID
-      ================================================= */
+      /* ORDER ID */
 
       const orderId = String(data?.orderId || "");
 
@@ -367,20 +311,37 @@ export default function CheckoutPage() {
       }
 
       /* =================================================
-         CLEAR CART
+         PURCHASE
       ================================================= */
+
+      const contentIds = items.map((item) => String(item._id));
+
+      const numItems = items.reduce(
+        (sum, item) => sum + Number(item.quantity || 0),
+        0,
+      );
+
+      trackMetaEvent("Purchase", {
+        content_ids: contentIds,
+
+        content_type: "product",
+
+        value: Number(total),
+
+        currency: "BDT",
+
+        num_items: numItems,
+
+        order_id: orderId,
+      });
+
+      /* CLEAR CART */
 
       localStorage.removeItem("loo_cart");
 
-      /* =================================================
-         UPDATE CART
-      ================================================= */
-
       window.dispatchEvent(new Event("loo-cart"));
 
-      /* =================================================
-         SUCCESS
-      ================================================= */
+      /* SUCCESS */
 
       setSuccessOrderId(orderId);
     } catch (error) {
@@ -425,193 +386,12 @@ export default function CheckoutPage() {
 
   if (successOrderId) {
     return (
-      <main className="container section">
-        <div className="checkout-success">
-          <div className="success-icon-wrap">✓</div>
-
-          <span className="eyebrow">ORDER CONFIRMED</span>
-
-          <h1>Order Placed Successfully! 🎉</h1>
-
-          <p className="success-description">
-            Thank you for shopping with <strong>Little One Outlet</strong> ❤️
-          </p>
-
-          <div className="success-order-id">
-            <span>Your Order ID</span>
-
-            <strong>#{successOrderId}</strong>
-
-            <small>Please save this Order ID to track your order.</small>
-          </div>
-
-          {/* PAYMENT SUCCESS */}
-
-          <div className="checkout-payment-success">
-            <div className="checkout-payment-success-header">
-              <span>💳</span>
-
-              <div>
-                <strong>Payment Method</strong>
-
-                <small>{PAYMENT_DETAILS[payment].title}</small>
-              </div>
-            </div>
-
-            {/* COD */}
-
-            {payment === "cod" && (
-              <div className="checkout-payment-details">
-                <div className="payment-method-icon">💵</div>
-
-                <strong>Cash on Delivery</strong>
-
-                <p>You can pay when your order is delivered.</p>
-              </div>
-            )}
-
-            {/* BKASH */}
-
-            {payment === "bkash" && (
-              <div className="checkout-payment-details">
-                <span className="payment-detail-label">bKash Payment</span>
-
-                <div className="payment-number-box">
-                  <span>Send Money to</span>
-
-                  <strong>01778930553</strong>
-                </div>
-
-                <div className="payment-warning">
-                  ⚠️ This is a <strong>Personal bKash Account</strong>. Please
-                  use <strong>Send Money</strong> only.
-                </div>
-
-                <p>
-                  Sender Number: <strong>{senderNumber}</strong>
-                </p>
-
-                <p>
-                  Transaction ID: <strong>{transactionId}</strong>
-                </p>
-              </div>
-            )}
-
-            {/* NAGAD */}
-
-            {payment === "nagad" && (
-              <div className="checkout-payment-details">
-                <span className="payment-detail-label">Nagad Payment</span>
-
-                <div className="payment-number-box">
-                  <span>Send Money to</span>
-
-                  <strong>01778930553</strong>
-                </div>
-
-                <div className="payment-warning">
-                  ⚠️ This is a <strong>Personal Nagad Account</strong>. Please
-                  use <strong>Send Money</strong> only.
-                </div>
-
-                <p>
-                  Sender Number: <strong>{senderNumber}</strong>
-                </p>
-
-                <p>
-                  Transaction ID: <strong>{transactionId}</strong>
-                </p>
-              </div>
-            )}
-
-            {/* BANK */}
-
-            {payment === "bank" && (
-              <div className="checkout-payment-details">
-                <span className="payment-detail-label">Bank Transfer</span>
-
-                <div className="bank-details">
-                  <div>
-                    <span>Bank Name</span>
-
-                    <strong>BRAC Bank PLC</strong>
-                  </div>
-
-                  <div>
-                    <span>Account Name</span>
-
-                    <strong>MD MAMUN MOLLA</strong>
-                  </div>
-
-                  <div>
-                    <span>Account Number</span>
-
-                    <strong>1053335630001</strong>
-                  </div>
-
-                  <div>
-                    <span>Branch Name</span>
-
-                    <strong>KONABARI SME/KRISHI BR</strong>
-                  </div>
-
-                  <div>
-                    <span>Routing Number</span>
-
-                    <strong>060330952</strong>
-                  </div>
-
-                  <div>
-                    <span>SWIFT Code</span>
-
-                    <strong>BRAKBDDH</strong>
-                  </div>
-                </div>
-
-                <p>
-                  Transaction ID: <strong>{transactionId}</strong>
-                </p>
-              </div>
-            )}
-          </div>
-
-          {/* NEXT STEP */}
-
-          <div className="checkout-next-step">
-            <span>📦</span>
-
-            <div>
-              <strong>What happens next?</strong>
-
-              <p>
-                We will contact you soon to confirm your order and delivery
-                details.
-              </p>
-            </div>
-          </div>
-
-          {/* ACTIONS */}
-
-          <div className="success-actions">
-            <Link
-              href={`/track-order?orderId=${encodeURIComponent(
-                successOrderId,
-              )}`}
-              className="btn"
-            >
-              Track Order →
-            </Link>
-
-            <Link href="/shop" className="btn secondary">
-              Continue Shopping
-            </Link>
-          </div>
-
-          <Link href="/" className="success-home">
-            ← Back to Home
-          </Link>
-        </div>
-      </main>
+      <CheckoutSuccess
+        orderId={successOrderId}
+        payment={payment}
+        senderNumber={senderNumber}
+        transactionId={transactionId}
+      />
     );
   }
 
@@ -643,8 +423,6 @@ export default function CheckoutPage() {
 
   return (
     <main className="container section">
-      {/* HEADER */}
-
       <div className="checkout-header">
         <Link href="/cart" className="text-link">
           ← Back to Cart
@@ -655,489 +433,48 @@ export default function CheckoutPage() {
         <p className="muted">Complete your details to place your order.</p>
       </div>
 
-      {/* ERROR */}
-
       {error && (
         <div className="checkout-error" role="alert">
           {error}
         </div>
       )}
 
-      {/* FORM */}
-
-      <form onSubmit={submit} className="checkout-layout">
-        {/* CUSTOMER FORM */}
-
-        <div className="form">
-          <h2>Delivery Details</h2>
-
-          {/* NAME */}
-
-          <label>
-            Full Name
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Your full name"
-              autoComplete="name"
-              required
-            />
-          </label>
-
-          {/* PHONE */}
-
-          <label>
-            Phone Number
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="01XXXXXXXXX"
-              inputMode="tel"
-              autoComplete="tel"
-              required
-            />
-          </label>
-
-          {/* ADDRESS */}
-
-          <label>
-            Full Address
-            <textarea
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-              placeholder="House, road, area..."
-              rows={4}
-              required
-            />
-          </label>
-
-          {/* AREA */}
-
-          <label>
-            Area
-            <input
-              value={area}
-              onChange={(e) => setArea(e.target.value)}
-              placeholder="e.g. Mirpur, Uttara"
-            />
-          </label>
-
-          {/* DISTRICT */}
-
-          <label>
-            District
-            <input
-              value={district}
-              onChange={(e) => setDistrict(e.target.value)}
-              placeholder="Dhaka"
-            />
-          </label>
-
-          {/* DELIVERY */}
-
-          <div className="checkout-section-block">
-            <strong>Delivery Area</strong>
-
-            <div className="checkout-delivery-options">
-              {/* INSIDE */}
-
-              <label
-                className={`checkout-option ${
-                  deliveryType === "inside" ? "active" : ""
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="deliveryType"
-                  value="inside"
-                  checked={deliveryType === "inside"}
-                  onChange={() => setDeliveryType("inside")}
-                />
-
-                <span>
-                  <strong>Inside Dhaka</strong>
-
-                  <small>৳80 delivery</small>
-                </span>
-              </label>
-
-              {/* OUTSIDE */}
-
-              <label
-                className={`checkout-option ${
-                  deliveryType === "outside" ? "active" : ""
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="deliveryType"
-                  value="outside"
-                  checked={deliveryType === "outside"}
-                  onChange={() => setDeliveryType("outside")}
-                />
-
-                <span>
-                  <strong>Outside Dhaka</strong>
-
-                  <small>৳130 delivery</small>
-                </span>
-              </label>
-            </div>
-          </div>
-
-          {/* PAYMENT METHOD */}
-
-          <div className="checkout-payment-section">
-            <strong>Payment Method</strong>
-
-            <div className="checkout-payment-options">
-              {/* COD */}
-
-              <label
-                className={`checkout-option ${
-                  payment === "cod" ? "active" : ""
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  value="cod"
-                  checked={payment === "cod"}
-                  onChange={() => handlePaymentChange("cod")}
-                />
-
-                <span>
-                  <strong>💵 Cash on Delivery</strong>
-
-                  <small>Pay when your order arrives</small>
-                </span>
-              </label>
-
-              {/* BKASH */}
-
-              <label
-                className={`checkout-option ${
-                  payment === "bkash" ? "active" : ""
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  value="bkash"
-                  checked={payment === "bkash"}
-                  onChange={() => handlePaymentChange("bkash")}
-                />
-
-                <span>
-                  <strong>📱 bKash</strong>
-
-                  <small>Send Money</small>
-                </span>
-              </label>
-
-              {/* NAGAD */}
-
-              <label
-                className={`checkout-option ${
-                  payment === "nagad" ? "active" : ""
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  value="nagad"
-                  checked={payment === "nagad"}
-                  onChange={() => handlePaymentChange("nagad")}
-                />
-
-                <span>
-                  <strong>🟠 Nagad</strong>
-
-                  <small>Send Money</small>
-                </span>
-              </label>
-
-              {/* BANK */}
-
-              <label
-                className={`checkout-option ${
-                  payment === "bank" ? "active" : ""
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="payment"
-                  value="bank"
-                  checked={payment === "bank"}
-                  onChange={() => handlePaymentChange("bank")}
-                />
-
-                <span>
-                  <strong>🏦 Bank Transfer</strong>
-
-                  <small>Direct bank transfer</small>
-                </span>
-              </label>
-            </div>
-
-            {/* BKASH */}
-
-            {payment === "bkash" && (
-              <div className="payment-details">
-                <div className="payment-details-title">📱 bKash Payment</div>
-
-                <div className="payment-number-box">
-                  <span>Send Money to</span>
-
-                  <strong>01778930553</strong>
-                </div>
-
-                <div className="payment-warning">
-                  ⚠️ This is a <strong>Personal bKash Account</strong>. Please
-                  use <strong>Send Money</strong> only.
-                </div>
-
-                <p className="payment-instruction">
-                  After sending the payment, enter your Sender Number and
-                  Transaction ID below.
-                </p>
-
-                <div className="payment-input-grid">
-                  <label>
-                    Sender Number
-                    <input
-                      type="tel"
-                      value={senderNumber}
-                      onChange={(e) => setSenderNumber(e.target.value)}
-                      placeholder="01XXXXXXXXX"
-                      inputMode="tel"
-                    />
-                  </label>
-
-                  <label>
-                    Transaction ID
-                    <input
-                      type="text"
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      placeholder="Enter Transaction ID"
-                    />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* NAGAD */}
-
-            {payment === "nagad" && (
-              <div className="payment-details">
-                <div className="payment-details-title">🟠 Nagad Payment</div>
-
-                <div className="payment-number-box">
-                  <span>Send Money to</span>
-
-                  <strong>01778930553</strong>
-                </div>
-
-                <div className="payment-warning">
-                  ⚠️ This is a <strong>Personal Nagad Account</strong>. Please
-                  use <strong>Send Money</strong> only.
-                </div>
-
-                <p className="payment-instruction">
-                  After sending the payment, enter your Sender Number and
-                  Transaction ID below.
-                </p>
-
-                <div className="payment-input-grid">
-                  <label>
-                    Sender Number
-                    <input
-                      type="tel"
-                      value={senderNumber}
-                      onChange={(e) => setSenderNumber(e.target.value)}
-                      placeholder="01XXXXXXXXX"
-                      inputMode="tel"
-                    />
-                  </label>
-
-                  <label>
-                    Transaction ID
-                    <input
-                      type="text"
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      placeholder="Enter Transaction ID"
-                    />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* BANK */}
-
-            {payment === "bank" && (
-              <div className="payment-details">
-                <div className="payment-details-title">🏦 Bank Transfer</div>
-
-                <div className="bank-details">
-                  <div>
-                    <span>Bank Name</span>
-
-                    <strong>BRAC Bank PLC</strong>
-                  </div>
-
-                  <div>
-                    <span>Account Name</span>
-
-                    <strong>MD MAMUN MOLLA</strong>
-                  </div>
-
-                  <div>
-                    <span>Account Number</span>
-
-                    <strong>1053335630001</strong>
-                  </div>
-
-                  <div>
-                    <span>Branch Name</span>
-
-                    <strong>KONABARI SME/KRISHI BR</strong>
-                  </div>
-
-                  <div>
-                    <span>Routing Number</span>
-
-                    <strong>060330952</strong>
-                  </div>
-
-                  <div>
-                    <span>SWIFT Code</span>
-
-                    <strong>BRAKBDDH</strong>
-                  </div>
-                </div>
-
-                <p className="payment-instruction">
-                  After completing the bank transfer, enter your Transaction ID
-                  below.
-                </p>
-
-                <div className="payment-input-grid">
-                  <label>
-                    Transaction ID
-                    <input
-                      type="text"
-                      value={transactionId}
-                      onChange={(e) => setTransactionId(e.target.value)}
-                      placeholder="Enter Transaction ID"
-                    />
-                  </label>
-                </div>
-              </div>
-            )}
-
-            {/* COD */}
-
-            {payment === "cod" && (
-              <div className="payment-cod-info">
-                💵 You can pay when your order is delivered.
-              </div>
-            )}
-          </div>
-
-          {/* ORDER NOTE */}
-
-          <label>
-            Order Note
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="Any special instruction? (Optional)"
-              rows={3}
-            />
-          </label>
-
-          {/* SUBMIT */}
-
-          <button
-            type="submit"
-            className="btn checkout-submit"
-            disabled={submitting}
-          >
-            {submitting ? "Placing Order..." : `Place Order • ৳${total}`}
-          </button>
-        </div>
-
-        {/* ORDER SUMMARY */}
-
-        <aside className="checkout-summary">
-          <h2>Your Order</h2>
-
-          <p className="muted">
-            {itemCount} item
-            {itemCount !== 1 ? "s" : ""}
-          </p>
-
-          <div className="checkout-items">
-            {items.map((item) => {
-              const price = getPrice(item);
-
-              const image = item.variantImage || item.images?.[0];
-
-              return (
-                <div key={item._id} className="checkout-item">
-                  {image ? (
-                    <img src={image} alt={item.name} width={62} height={62} />
-                  ) : (
-                    <div className="checkout-item-placeholder">🧸</div>
-                  )}
-
-                  <div className="checkout-item-info">
-                    <strong>{item.name}</strong>
-
-                    {item.variantColor && (
-                      <div className="checkout-item-color">
-                        Color: <strong>{item.variantColor}</strong>
-                      </div>
-                    )}
-
-                    <div className="checkout-item-qty">
-                      Qty: {item.quantity}
-                    </div>
-                  </div>
-
-                  <strong>৳{price * Number(item.quantity || 0)}</strong>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* SUMMARY */}
-
-          <div className="checkout-summary-details">
-            <div className="summary-row">
-              <span>Subtotal</span>
-
-              <strong>৳{subtotal}</strong>
-            </div>
-
-            <div className="summary-row">
-              <span>Delivery</span>
-
-              <strong>৳{delivery}</strong>
-            </div>
-
-            <hr />
-
-            <div className="summary-total">
-              <strong>Total</strong>
-
-              <strong>৳{total}</strong>
-            </div>
-          </div>
-        </aside>
-      </form>
+      <div className="checkout-layout">
+        <CheckoutCustomerForm
+          name={name}
+          phone={phone}
+          address={address}
+          area={area}
+          district={district}
+          deliveryType={deliveryType}
+          payment={payment}
+          senderNumber={senderNumber}
+          transactionId={transactionId}
+          note={note}
+          total={total}
+          submitting={submitting}
+          onSubmit={submit}
+          onNameChange={setName}
+          onPhoneChange={setPhone}
+          onAddressChange={setAddress}
+          onAreaChange={setArea}
+          onDistrictChange={setDistrict}
+          onDeliveryTypeChange={setDeliveryType}
+          onPaymentChange={handlePaymentChange}
+          onSenderNumberChange={setSenderNumber}
+          onTransactionIdChange={setTransactionId}
+          onNoteChange={setNote}
+        />
+
+        <CheckoutOrderSummary
+          items={items}
+          subtotal={subtotal}
+          delivery={delivery}
+          total={total}
+          itemCount={itemCount}
+          getPrice={getPrice}
+        />
+      </div>
     </main>
   );
 }
