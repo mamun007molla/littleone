@@ -1,8 +1,21 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { CartItem } from "@/models/types";
+
+// Meta Pixel TypeScript declaration
+type MetaPixelFunction = (
+  command: string,
+  eventName: string,
+  parameters?: Record<string, unknown>,
+) => void;
+
+declare global {
+  interface Window {
+    fbq?: MetaPixelFunction;
+  }
+}
 
 type DeliveryType = "inside" | "outside";
 
@@ -48,6 +61,8 @@ export default function CheckoutPage() {
   const [error, setError] = useState("");
 
   const [successOrderId, setSuccessOrderId] = useState("");
+
+  const initiateCheckoutFired = useRef(false);
 
   /* =====================================================
      CUSTOMER INFORMATION
@@ -137,6 +152,50 @@ export default function CheckoutPage() {
   const total = subtotal + delivery;
 
   /* =====================================================
+     META PIXEL - INITIATE CHECKOUT
+  ===================================================== */
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!items.length) return;
+
+    if (initiateCheckoutFired.current) {
+      return;
+    }
+
+    if (typeof window === "undefined" || typeof window.fbq !== "function") {
+      return;
+    }
+
+    initiateCheckoutFired.current = true;
+
+    const contentIds = items.map((item) => String(item._id));
+
+    const numItems = items.reduce(
+      (sum, item) => sum + Number(item.quantity || 0),
+      0,
+    );
+
+    const checkoutValue = Number(total);
+
+    window.fbq("track", "InitiateCheckout", {
+      content_ids: contentIds,
+      content_type: "product",
+      value: checkoutValue,
+      currency: "BDT",
+      num_items: numItems,
+    });
+
+    console.log("Meta Pixel InitiateCheckout fired", {
+      content_ids: contentIds,
+      value: checkoutValue,
+      currency: "BDT",
+      num_items: numItems,
+    });
+  }, [loading, items, total]);
+
+  /* =====================================================
      ITEM COUNT
   ===================================================== */
 
@@ -152,12 +211,8 @@ export default function CheckoutPage() {
   const handlePaymentChange = (method: PaymentMethod) => {
     setPayment(method);
 
-    /*
-     * Clear payment information
-     * when changing method.
-     */
-
     setSenderNumber("");
+
     setTransactionId("");
   };
 
@@ -233,9 +288,6 @@ export default function CheckoutPage() {
     try {
       /* =================================================
          ORDER ITEMS
-
-         Only send product IDs and quantities.
-         Backend should verify prices.
       ================================================= */
 
       const orderItems = items.map((item) => ({
@@ -277,10 +329,6 @@ export default function CheckoutPage() {
           deliveryType,
 
           payment,
-
-          /*
-           * Payment information
-           */
 
           senderNumber: senderNumber.trim(),
 
@@ -379,8 +427,6 @@ export default function CheckoutPage() {
     return (
       <main className="container section">
         <div className="checkout-success">
-          {/* SUCCESS ICON */}
-
           <div className="success-icon-wrap">✓</div>
 
           <span className="eyebrow">ORDER CONFIRMED</span>
@@ -391,8 +437,6 @@ export default function CheckoutPage() {
             Thank you for shopping with <strong>Little One Outlet</strong> ❤️
           </p>
 
-          {/* ORDER ID */}
-
           <div className="success-order-id">
             <span>Your Order ID</span>
 
@@ -401,9 +445,7 @@ export default function CheckoutPage() {
             <small>Please save this Order ID to track your order.</small>
           </div>
 
-          {/* =================================================
-              PAYMENT SUCCESS
-          ================================================= */}
+          {/* PAYMENT SUCCESS */}
 
           <div className="checkout-payment-success">
             <div className="checkout-payment-success-header">
@@ -416,9 +458,7 @@ export default function CheckoutPage() {
               </div>
             </div>
 
-            {/* =========================
-                COD
-            ========================= */}
+            {/* COD */}
 
             {payment === "cod" && (
               <div className="checkout-payment-details">
@@ -430,9 +470,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* =========================
-                BKASH
-            ========================= */}
+            {/* BKASH */}
 
             {payment === "bkash" && (
               <div className="checkout-payment-details">
@@ -459,9 +497,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* =========================
-                NAGAD
-            ========================= */}
+            {/* NAGAD */}
 
             {payment === "nagad" && (
               <div className="checkout-payment-details">
@@ -488,9 +524,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* =========================
-                BANK
-            ========================= */}
+            {/* BANK */}
 
             {payment === "bank" && (
               <div className="checkout-payment-details">
@@ -541,9 +575,7 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* =================================================
-              NEXT STEP
-          ================================================= */}
+          {/* NEXT STEP */}
 
           <div className="checkout-next-step">
             <span>📦</span>
@@ -558,9 +590,7 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* =================================================
-              ACTIONS
-          ================================================= */}
+          {/* ACTIONS */}
 
           <div className="success-actions">
             <Link
@@ -633,14 +663,10 @@ export default function CheckoutPage() {
         </div>
       )}
 
-      {/* =================================================
-          FORM
-      ================================================= */}
+      {/* FORM */}
 
       <form onSubmit={submit} className="checkout-layout">
-        {/* =================================================
-            CUSTOMER FORM
-        ================================================= */}
+        {/* CUSTOMER FORM */}
 
         <div className="form">
           <h2>Delivery Details</h2>
@@ -707,9 +733,7 @@ export default function CheckoutPage() {
             />
           </label>
 
-          {/* =================================================
-              DELIVERY
-          ================================================= */}
+          {/* DELIVERY */}
 
           <div className="checkout-section-block">
             <strong>Delivery Area</strong>
@@ -761,9 +785,7 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* =================================================
-              PAYMENT METHOD
-          ================================================= */}
+          {/* PAYMENT METHOD */}
 
           <div className="checkout-payment-section">
             <strong>Payment Method</strong>
@@ -858,9 +880,7 @@ export default function CheckoutPage() {
               </label>
             </div>
 
-            {/* =================================================
-                BKASH
-            ================================================= */}
+            {/* BKASH */}
 
             {payment === "bkash" && (
               <div className="payment-details">
@@ -907,9 +927,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* =================================================
-                NAGAD
-            ================================================= */}
+            {/* NAGAD */}
 
             {payment === "nagad" && (
               <div className="payment-details">
@@ -956,9 +974,7 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {/* =================================================
-                BANK
-            ================================================= */}
+            {/* BANK */}
 
             {payment === "bank" && (
               <div className="payment-details">
@@ -1030,9 +1046,7 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          {/* =================================================
-              ORDER NOTE
-          ================================================= */}
+          {/* ORDER NOTE */}
 
           <label>
             Order Note
@@ -1044,9 +1058,7 @@ export default function CheckoutPage() {
             />
           </label>
 
-          {/* =================================================
-              SUBMIT
-          ================================================= */}
+          {/* SUBMIT */}
 
           <button
             type="submit"
@@ -1057,9 +1069,7 @@ export default function CheckoutPage() {
           </button>
         </div>
 
-        {/* =================================================
-            ORDER SUMMARY
-        ================================================= */}
+        {/* ORDER SUMMARY */}
 
         <aside className="checkout-summary">
           <h2>Your Order</h2>
