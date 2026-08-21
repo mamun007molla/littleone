@@ -17860,3 +17860,468 @@ input[type="checkbox"] {
     font-size: 9px;
   }
 }
+
+/* =========================================================
+   PRODUCT DETAILS - NEW RESPONSIVE LAYOUT
+========================================================= */
+
+.product-details-layout {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.08fr)
+    minmax(360px, 0.92fr);
+  gap: 48px;
+  align-items: start;
+}
+
+.product-details-gallery {
+  min-width: 0;
+  position: sticky;
+  top: 90px;
+}
+
+.product-details-info {
+  min-width: 0;
+}
+
+/* =========================================================
+   BADGES
+========================================================= */
+
+.product-detail-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.detail-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.detail-badge.offer {
+  background: #fff1f1;
+  color: #d93636;
+}
+
+.detail-badge.bestseller {
+  background: #fff7df;
+  color: #a66a00;
+}
+
+.detail-badge.new {
+  background: #eef2ff;
+  color: #3742fa;
+}
+
+/* =========================================================
+   CATEGORIES
+========================================================= */
+
+.product-detail-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 8px;
+  margin-bottom: 9px;
+}
+
+.product-detail-categories span {
+  color: #3742fa;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+/* =========================================================
+   TITLE
+========================================================= */
+
+.product-detail-title {
+  margin: 0;
+  color: #202638;
+  font-size: clamp(30px, 4vw, 46px);
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -1px;
+}
+
+/* =========================================================
+   AGE
+========================================================= */
+
+.product-detail-age {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  color: #303746;
+  font-size: 14px;
+}
+
+.product-detail-age strong {
+  font-weight: 800;
+}
+
+/* =========================================================
+   PRICE
+========================================================= */
+
+.product-detail-price-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.product-detail-price {
+  color: #202638;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.product-detail-old-price {
+  color: #6c7280;
+  font-size: 15px;
+  text-decoration: line-through;
+}
+
+.product-detail-discount {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #fff0f0;
+  color: #d73535;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* =========================================================
+   STOCK
+========================================================= */
+
+.product-detail-stock {
+  margin-top: 12px;
+  color: #a66a00;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.product-detail-stock.out {
+  color: #c62828;
+}
+
+/* =========================================================
+   VARIANT
+========================================================= */
+
+.product-detail-variant-box {
+  margin-top: 22px;
+}
+
+/* =========================================================
+   CART
+========================================================= */
+
+.product-detail-cart {
+  margin-top: 18px;
+}
+
+/* =========================================================
+   TRUST
+========================================================= */
+
+.product-trust-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.product-trust-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.product-trust-card > span {
+  font-size: 19px;
+  line-height: 1;
+}
+
+.product-trust-card strong {
+  display: block;
+  color: #273043;
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.product-trust-card small {
+  display: block;
+  margin-top: 4px;
+  color: #697181;
+  font-size: 11px;
+}
+
+/* =========================================================
+   DESCRIPTION
+========================================================= */
+
+.product-description-section {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.product-description-section h3,
+.product-features-section h3 {
+  margin: 0 0 10px;
+  color: #273043;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.product-description {
+  color: #303746;
+  font-size: 15px;
+  line-height: 1.8;
+  white-space: pre-line;
+}
+
+.product-description.collapsed {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+
+.description-toggle {
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #3742fa;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.description-toggle:hover {
+  text-decoration: underline;
+}
+
+/* =========================================================
+   FEATURES
+========================================================= */
+
+.product-features-section {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid var(--line);
+}
+
+.product-features-section ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #303746;
+  font-size: 14px;
+  line-height: 1.8;
+}
+
+.product-features-section li + li {
+  margin-top: 4px;
+}
+
+/* =========================================================
+   TABLET
+========================================================= */
+
+@media (max-width: 900px) {
+  .product-details-layout {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .product-details-gallery {
+    position: static;
+  }
+
+  .product-details-info {
+    width: 100%;
+  }
+
+  .product-detail-title {
+    font-size: clamp(28px, 6vw, 38px);
+  }
+}
+
+/* =========================================================
+   MOBILE
+========================================================= */
+
+@media (max-width: 650px) {
+  .product-details-layout {
+    display: block;
+  }
+
+  .product-details-gallery {
+    margin-bottom: 22px;
+  }
+
+  .product-details-info {
+    width: 100%;
+  }
+
+  .product-detail-badges {
+    margin-bottom: 9px;
+  }
+
+  .detail-badge {
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+
+  .product-detail-categories {
+    gap: 3px 7px;
+    margin-bottom: 8px;
+  }
+
+  .product-detail-categories span {
+    font-size: 9px;
+    letter-spacing: 0.7px;
+  }
+
+  .product-detail-title {
+    font-size: 30px;
+    line-height: 1.08;
+    letter-spacing: -0.7px;
+  }
+
+  .product-detail-age {
+    margin-top: 11px;
+    font-size: 13px;
+  }
+
+  .product-detail-price-row {
+    margin-top: 16px;
+    gap: 8px;
+  }
+
+  .product-detail-price {
+    font-size: 28px;
+  }
+
+  .product-detail-old-price {
+    font-size: 14px;
+  }
+
+  .product-detail-discount {
+    padding: 5px 8px;
+    font-size: 10px;
+  }
+
+  .product-detail-stock {
+    margin-top: 9px;
+    font-size: 14px;
+  }
+
+  .product-detail-variant-box {
+    margin-top: 18px;
+  }
+
+  .product-detail-cart {
+    margin-top: 15px;
+  }
+
+  .product-trust-grid {
+    gap: 8px;
+    margin-top: 14px;
+  }
+
+  .product-trust-card {
+    min-height: 70px;
+    padding: 11px;
+    gap: 7px;
+  }
+
+  .product-trust-card > span {
+    font-size: 17px;
+  }
+
+  .product-trust-card strong {
+    font-size: 12px;
+  }
+
+  .product-trust-card small {
+    font-size: 10px;
+  }
+
+  .product-description-section {
+    margin-top: 20px;
+    padding-top: 18px;
+  }
+
+  .product-description-section h3,
+  .product-features-section h3 {
+    font-size: 16px;
+  }
+
+  .product-description {
+    font-size: 14px;
+    line-height: 1.75;
+  }
+
+  .product-features-section {
+    margin-top: 20px;
+    padding-top: 18px;
+  }
+
+  .product-features-section ul {
+    font-size: 13px;
+    line-height: 1.7;
+  }
+}
+
+/* =========================================================
+   VERY SMALL PHONES
+========================================================= */
+
+@media (max-width: 380px) {
+  .product-detail-title {
+    font-size: 27px;
+  }
+
+  .product-detail-price {
+    font-size: 26px;
+  }
+
+  .product-trust-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .product-trust-card {
+    padding: 9px;
+  }
+
+  .product-trust-card strong {
+    font-size: 11px;
+  }
+
+  .product-trust-card small {
+    font-size: 9px;
+  }
+}
